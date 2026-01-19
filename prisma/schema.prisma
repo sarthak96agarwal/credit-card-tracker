@@ -1,0 +1,75 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Owner {
+  id        String       @id @default(uuid())
+  name      String       @unique
+  createdAt DateTime     @default(now())
+  cards     CreditCard[]
+}
+
+model CreditCard {
+  id            String            @id @default(uuid())
+  ownerId       String
+  owner         Owner             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name          String
+  issuer        String
+  annualFee     Decimal           @default(0)
+  lastFour      String?
+  color         String            @default("#1f2937")
+  annualFeeDate DateTime?
+  createdAt     DateTime          @default(now())
+  benefits      Benefit[]
+  multipliers   PointMultiplier[]
+}
+
+enum BenefitPeriod {
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+}
+
+model Benefit {
+  id          String         @id @default(uuid())
+  cardId      String
+  card        CreditCard     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  name        String
+  value       Decimal
+  period      BenefitPeriod
+  category    String
+  description String?
+  isSkipped   Boolean        @default(false)  // User doesn't use this benefit
+  isAutoUse   Boolean        @default(false)  // Benefit is automatically used each period
+  createdAt   DateTime       @default(now())
+  usages      BenefitUsage[]
+}
+
+model BenefitUsage {
+  id          String   @id @default(uuid())
+  benefitId   String
+  benefit     Benefit  @relation(fields: [benefitId], references: [id], onDelete: Cascade)
+  periodStart DateTime
+  periodEnd   DateTime
+  usedAmount  Decimal
+  usedAt      DateTime @default(now())
+  notes       String?
+}
+
+model PointMultiplier {
+  id         String     @id @default(uuid())
+  cardId     String
+  card       CreditCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  category   String
+  multiplier Decimal
+  notes      String?
+  createdAt  DateTime   @default(now())
+}
