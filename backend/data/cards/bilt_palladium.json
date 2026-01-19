@@ -1,8 +1,9 @@
 {
-  "name": "Bilt Mastercard",
+  "name": "Bilt Palladium",
   "issuer": "Bilt Rewards",
   "annual_fee": 495,
   "color": "#000000",
+  "image": "/cards/bilt-palladium.png",
   "benefits": [
     {
       "name": "Bilt Travel Hotel Credit",

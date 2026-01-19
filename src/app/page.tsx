@@ -12,9 +12,10 @@ type CardFilter = "all" | string;
 const CARD_IMAGES: Record<string, string> = {
   "Amex Platinum": "/cards/amex-platinum.png",
   "Amex Gold": "/cards/amex-gold.png",
-  "Chase Sapphire Reserve": "/cards/chase-sapphire-reserve.png",
-  "Citi Custom Cash": "/cards/citi-custom-cash.png",
-  "Discover it": "/cards/discover-it.png",
+  "Amex Delta Gold": "/cards/amex-delta-gold.png",
+  "Bilt Palladium": "/cards/bilt-palladium.png",
+  "Capital One Venture X": "/cards/venture-x.png",
+  "United Explorer Card": "/cards/united-explorer.png",
 };
 
 function getCardImage(cardName: string): string | null {

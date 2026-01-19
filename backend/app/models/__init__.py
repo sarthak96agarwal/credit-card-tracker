@@ -6,6 +6,8 @@ from .credit_card import CreditCard
 from .benefit import Benefit, BenefitPeriod
 from .benefit_usage import BenefitUsage
 from .point_multiplier import PointMultiplier
+from .notification_preference import NotificationPreference
+from .notification_history import NotificationHistory
 
 __all__ = [
     "Owner",
@@ -17,4 +19,6 @@ __all__ = [
     "BenefitPeriod",
     "BenefitUsage",
     "PointMultiplier",
+    "NotificationPreference",
+    "NotificationHistory",
 ]

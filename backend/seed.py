@@ -14,7 +14,9 @@ from app.models import (
     CreditCard,
     Benefit,
     PointMultiplier,
-    BenefitPeriod
+    BenefitPeriod,
+    NotificationPreference,
+    NotificationHistory
 )
 from decimal import Decimal
 
@@ -45,6 +47,8 @@ def seed_from_json():
     try:
         # Clear existing data (in correct order for foreign keys)
         print("Clearing existing data...")
+        db.query(NotificationHistory).delete()
+        db.query(NotificationPreference).delete()
         db.query(PointMultiplier).delete()
         db.query(Benefit).delete()
         db.query(CreditCard).delete()
@@ -88,6 +92,7 @@ def seed_from_json():
                 issuer=card_data["issuer"],
                 annual_fee=Decimal(str(card_data.get("annual_fee", 0))),
                 color=card_data.get("color", "#1f2937"),
+                image=card_data.get("image"),
             )
             db.add(template)
             db.commit()
@@ -134,14 +139,31 @@ def seed_from_json():
 
         for owner_data in owners_data["owners"]:
             owner_name = owner_data["name"]
+            owner_email = owner_data.get("email")
             print(f"  Creating owner: {owner_name}")
 
             # Create Owner
-            owner = Owner(name=owner_name)
+            owner = Owner(
+                name=owner_name,
+                email=owner_email,
+                notifications_enabled=True
+            )
             db.add(owner)
             db.commit()
             db.refresh(owner)
             owners_created += 1
+
+            # Create default NotificationPreference for owner
+            notification_pref = NotificationPreference(
+                owner_id=owner.id,
+                email_enabled=True,
+                push_enabled=True,
+                monthly_reminder=True,
+                expiry_3day_warning=True,
+                expiry_final_day=True
+            )
+            db.add(notification_pref)
+            db.commit()
 
             # Assign cards to owner
             for card_slug in owner_data.get("cards", []):

@@ -3,6 +3,7 @@
   "issuer": "Capital One",
   "annual_fee": 395,
   "color": "#1A1A1A",
+  "image": "/cards/venture-x.png",
   "benefits": [
     {
       "name": "Capital One Travel Credit",

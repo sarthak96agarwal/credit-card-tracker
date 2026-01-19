@@ -3,6 +3,7 @@
   "issuer": "American Express",
   "annual_fee": 895,
   "color": "#E5E4E2",
+  "image": "/cards/amex-platinum.png",
   "benefits": [
     {
       "name": "Uber One Credit",

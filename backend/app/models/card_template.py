@@ -16,6 +16,7 @@ class CardTemplate(Base):
     issuer = Column(String, nullable=False)  # e.g., "American Express"
     annual_fee = Column(Numeric(10, 2), default=0)
     color = Column(String, default="#1f2937")
+    image = Column(String, nullable=True)  # Path to card image, e.g., "/cards/amex-platinum.png"
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Template benefits and multipliers

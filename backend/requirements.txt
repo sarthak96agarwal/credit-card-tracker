@@ -6,3 +6,10 @@ pydantic>=2.0.0
 pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
 alembic>=1.13.0
+
+# Notifications
+apscheduler>=3.10.0
+sendgrid>=6.10.0
+
+# Future: Kafka (Phase 2)
+# confluent-kafka>=2.3.0

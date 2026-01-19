@@ -3,6 +3,7 @@
   "issuer": "Chase",
   "annual_fee": 150,
   "color": "#0033A0",
+  "image": "/cards/united-explorer.png",
   "benefits": [
     {
       "name": "United Hotels Credit",

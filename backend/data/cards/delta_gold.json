@@ -3,6 +3,7 @@
   "issuer": "American Express",
   "annual_fee": 150,
   "color": "#003366",
+  "image": "/cards/amex-delta-gold.png",
   "benefits": [
     {
       "name": "Delta Stays Credit",

@@ -15,7 +15,12 @@
       "Bash(python seed.py:*)",
       "Bash(curl:*)",
       "Bash(python:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(xargs ls:*)",
+      "Bash(pkill:*)",
+      "Bash(uvicorn:*)",
+      "Bash(PGPASSWORD=\"\" psql -h localhost -U sarthak96agarwal -d credit_cards -c \"DELETE FROM notification_history; SELECT COUNT\\(*\\) as cleared FROM notification_history;\")",
+      "Bash(/Users/sarthak96agarwal/.pyenv/versions/3.13.0/bin/python3.13:*)"
     ]
   }
 }

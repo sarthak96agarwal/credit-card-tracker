@@ -38,3 +38,7 @@ class CreditCard(Base):
     @property
     def color(self):
         return self.template.color if self.template else "#1f2937"
+
+    @property
+    def image(self):
+        return self.template.image if self.template else None

@@ -3,6 +3,7 @@
   "issuer": "American Express",
   "annual_fee": 325,
   "color": "#D4AF37",
+  "image": "/cards/amex-gold.png",
   "benefits": [
     {
       "name": "Resy Credit",
