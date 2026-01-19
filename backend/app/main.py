@@ -45,7 +45,10 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",  # Local development
+        "https://credit-card-tracker-production.up.railway.app",  # Railway frontend
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
