@@ -3,16 +3,32 @@
 import { useEffect, useState } from "react";
 import { api, CardAnalysis, Owner } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
+import ChatWidget from "@/components/ChatWidget";
 
 export default function AnalysisPage() {
   const [owners, setOwners] = useState<Owner[]>([]);
   const [selectedOwner, setSelectedOwner] = useState<string>("");
   const [analysis, setAnalysis] = useState<CardAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
+  const [aiInsights, setAiInsights] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     api.getOwners().then(setOwners);
   }, []);
+
+  // Fetch AI insights when owner is selected
+  useEffect(() => {
+    if (selectedOwner) {
+      setAiLoading(true);
+      api.getInsights(selectedOwner)
+        .then((data) => setAiInsights(data.insights))
+        .catch(() => setAiInsights(null))
+        .finally(() => setAiLoading(false));
+    } else {
+      setAiInsights(null);
+    }
+  }, [selectedOwner]);
 
   useEffect(() => {
     setLoading(true);
@@ -91,6 +107,30 @@ export default function AnalysisPage() {
               bgColor="bg-purple-50 dark:bg-purple-900/20"
             />
           </div>
+
+          {/* AI Insights */}
+          {selectedOwner && (
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl p-5 border border-indigo-200 dark:border-indigo-800">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">✨</span>
+                <h2 className="text-lg font-semibold text-indigo-800 dark:text-indigo-300">AI Recommendations</h2>
+              </div>
+              {aiLoading ? (
+                <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
+                  <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm">Analyzing your benefits...</span>
+                </div>
+              ) : aiInsights ? (
+                <div className="text-sm text-indigo-800 dark:text-indigo-300 whitespace-pre-line">
+                  {aiInsights}
+                </div>
+              ) : (
+                <p className="text-sm text-indigo-600 dark:text-indigo-400">
+                  Select an owner to get personalized AI recommendations.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Card-by-Card Analysis Grid */}
           <div>
@@ -171,6 +211,14 @@ export default function AnalysisPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* AI Chat Widget */}
+      {selectedOwner && (
+        <ChatWidget
+          ownerId={selectedOwner}
+          ownerName={owners.find(o => o.id === selectedOwner)?.name || "there"}
+        />
       )}
     </div>
   );

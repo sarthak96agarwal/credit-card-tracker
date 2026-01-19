@@ -4,7 +4,7 @@ from typing import List
 
 from app.database import get_db
 from app.models import Owner
-from app.schemas import OwnerCreate, OwnerResponse, OwnerWithCards
+from app.schemas import OwnerCreate, OwnerUpdate, OwnerResponse, OwnerWithCards
 
 router = APIRouter(prefix="/owners", tags=["owners"])
 
@@ -30,6 +30,21 @@ def create_owner(owner: OwnerCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_owner)
     return db_owner
+
+
+@router.put("/{owner_id}", response_model=OwnerResponse)
+def update_owner(owner_id: str, update: OwnerUpdate, db: Session = Depends(get_db)):
+    owner = db.query(Owner).filter(Owner.id == owner_id).first()
+    if not owner:
+        raise HTTPException(status_code=404, detail="Owner not found")
+
+    update_data = update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(owner, field, value)
+
+    db.commit()
+    db.refresh(owner)
+    return owner
 
 
 @router.delete("/{owner_id}")

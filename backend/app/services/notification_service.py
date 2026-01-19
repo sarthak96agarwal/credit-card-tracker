@@ -16,6 +16,7 @@ from app.models import (
     BenefitPeriod
 )
 from app.services.email_service import email_service
+from app.services.ai_service import ai_service
 
 logger = logging.getLogger(__name__)
 
@@ -296,10 +297,22 @@ class NotificationService:
                 len(card["benefits"]) for card in benefits_data.get("yearly", [])
             )
 
+            # Generate AI insights
+            ai_insights = None
+            if ai_service.is_configured():
+                try:
+                    ai_insights = ai_service.generate_email_insights(
+                        benefits_data=benefits_data,
+                        owner_name=owner.name
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to generate AI insights for {owner.name}: {e}")
+
             success = email_service.send_monthly_reminder(
                 to_email=owner.email,
                 owner_name=owner.name,
-                benefits_data=benefits_data
+                benefits_data=benefits_data,
+                ai_insights=ai_insights
             )
 
             if success:

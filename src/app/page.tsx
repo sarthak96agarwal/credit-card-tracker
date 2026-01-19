@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api, Benefit, Owner, CreditCard } from "@/lib/api";
 import { formatCurrency, getCurrentPeriodDates, getDaysRemaining, BenefitPeriod } from "@/lib/utils";
 import Image from "next/image";
+import ChatWidget from "@/components/ChatWidget";
 
 type TimeFilter = "all" | "week" | "month" | "completed" | "skipped";
 type CardFilter = "all" | string;
@@ -378,6 +379,14 @@ export default function Dashboard() {
           onClose={() => setSelectedBenefit(null)}
           onUpdateUsage={handleUpdateUsage}
           onRefresh={refreshBenefits}
+        />
+      )}
+
+      {/* AI Chat Widget */}
+      {selectedOwner && (
+        <ChatWidget
+          ownerId={selectedOwner}
+          ownerName={owners.find(o => o.id === selectedOwner)?.name || "there"}
         />
       )}
     </div>

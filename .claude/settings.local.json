@@ -20,7 +20,14 @@
       "Bash(pkill:*)",
       "Bash(uvicorn:*)",
       "Bash(PGPASSWORD=\"\" psql -h localhost -U sarthak96agarwal -d credit_cards -c \"DELETE FROM notification_history; SELECT COUNT\\(*\\) as cleared FROM notification_history;\")",
-      "Bash(/Users/sarthak96agarwal/.pyenv/versions/3.13.0/bin/python3.13:*)"
+      "Bash(/Users/sarthak96agarwal/.pyenv/versions/3.13.0/bin/python3.13:*)",
+      "Bash(/Users/sarthak96agarwal/.pyenv/versions/3.13.0/bin/pip install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(AYUSHI_ID=\"716a0d51-46de-43d3-b68a-6e4a8a372987\":*)",
+      "Bash(__NEW_LINE_ac6ec435dd0936da__ echo \"=== Testing Insights ===\")",
+      "Bash(__NEW_LINE_782fc2948794b024__ echo -e \"\\\\n=== Testing Card Recommendation ===\")",
+      "Bash(__NEW_LINE_7c1f8f1f445034bd__ echo \"=== Testing Insights ===\")",
+      "Bash(__NEW_LINE_fdc703650d28873d__ echo \"Endpoints working!\")"
     ]
   }
 }

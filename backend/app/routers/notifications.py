@@ -151,6 +151,57 @@ def trigger_notifications(
     return stats
 
 
+@router.post("/send/{owner_id}")
+def send_notification_to_owner(
+    owner_id: str,
+    notification_type: str = "monthly_reminder",
+    db: Session = Depends(get_db)
+):
+    """Send a notification to a specific owner."""
+    owner = db.query(Owner).filter(Owner.id == owner_id).first()
+    if not owner:
+        raise HTTPException(status_code=404, detail="Owner not found")
+
+    if not owner.email:
+        raise HTTPException(status_code=400, detail="Owner has no email address")
+
+    service = NotificationService(db)
+
+    if notification_type == "monthly_reminder":
+        benefits_data = service.get_unused_benefits_for_owner(owner_id)
+        has_benefits = bool(benefits_data.get("monthly")) or bool(benefits_data.get("yearly"))
+
+        if not has_benefits:
+            return {"success": False, "message": "No unused benefits to remind about"}
+
+        # Generate AI insights
+        from app.services.ai_service import ai_service
+        ai_insights = None
+        if ai_service.is_configured():
+            try:
+                ai_insights = ai_service.generate_email_insights(
+                    benefits_data=benefits_data,
+                    owner_name=owner.name
+                )
+            except Exception:
+                pass
+
+        from app.services.email_service import email_service
+        success = email_service.send_monthly_reminder(
+            to_email=owner.email,
+            owner_name=owner.name,
+            benefits_data=benefits_data,
+            ai_insights=ai_insights
+        )
+
+        if success:
+            return {"success": True, "message": f"Email sent to {owner.email}"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to send email")
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown notification type: {notification_type}")
+
+
 @router.get("/status")
 def get_notification_status(db: Session = Depends(get_db)):
     """Get notification system status."""

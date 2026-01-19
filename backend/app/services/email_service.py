@@ -111,11 +111,46 @@ class EmailService:
         </div>
         """
 
+    def _build_insights_section(self, insights: str) -> str:
+        """Build HTML for the AI insights section."""
+        import re
+
+        # Convert markdown bullets to HTML list items
+        lines = insights.strip().split('\n')
+        html_items = []
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            # Remove markdown bullet points (* or -)
+            line = re.sub(r'^[\*\-]\s*', '', line)
+            # Convert **bold** to <strong>
+            line = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', line)
+            if line:
+                html_items.append(f'<li style="margin-bottom: 8px; color: #374151;">{line}</li>')
+
+        if not html_items:
+            return ""
+
+        return f"""
+        <div style="background: linear-gradient(135deg, #fef3c7, #fde68a); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+            <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                <span style="font-size: 20px; margin-right: 8px;">✨</span>
+                <h3 style="margin: 0; color: #92400e; font-size: 16px; font-weight: 600;">AI Insights</h3>
+            </div>
+            <ul style="margin: 0; padding-left: 20px; list-style-type: disc;">
+                {''.join(html_items)}
+            </ul>
+        </div>
+        """
+
     def send_monthly_reminder(
         self,
         to_email: str,
         owner_name: str,
-        benefits_data: dict
+        benefits_data: dict,
+        ai_insights: Optional[str] = None
     ) -> bool:
         """Send monthly reminder email with pending benefits grouped by card."""
         monthly_cards = benefits_data.get("monthly", [])
@@ -206,6 +241,9 @@ class EmailService:
                         <div style="font-size: 12px; color: #6b7280; text-transform: uppercase;">Total</div>
                     </div>
                 </div>
+
+                <!-- AI Insights -->
+                {self._build_insights_section(ai_insights) if ai_insights else ""}
 
                 <!-- Benefits by Section -->
                 {monthly_section}

@@ -22,6 +22,9 @@ export default function ManagePage() {
     ownerId: string;
     templateId: string;
   } | null>(null);
+  const [editingEmail, setEditingEmail] = useState<string | null>(null);
+  const [emailInput, setEmailInput] = useState("");
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -64,6 +67,31 @@ export default function ManagePage() {
       await loadData();
     } catch (error) {
       console.error("Failed to remove card:", error);
+    }
+  };
+
+  const handleUpdateEmail = async (ownerId: string) => {
+    try {
+      await api.updateOwner(ownerId, { email: emailInput || undefined });
+      await loadData();
+      setEditingEmail(null);
+      setEmailInput("");
+    } catch (error) {
+      console.error("Failed to update email:", error);
+      alert("Failed to update email");
+    }
+  };
+
+  const handleSendEmail = async (ownerId: string) => {
+    setSendingEmail(ownerId);
+    try {
+      const result = await api.sendNotificationToOwner(ownerId);
+      alert(result.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to send email";
+      alert(errorMessage);
+    } finally {
+      setSendingEmail(null);
     }
   };
 
@@ -163,12 +191,75 @@ export default function ManagePage() {
                 className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6"
               >
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-foreground">
-                    {owner.name}
-                  </h3>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {ownerCards.length} card{ownerCards.length !== 1 ? "s" : ""}
-                  </span>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">
+                      {owner.name}
+                    </h3>
+                    {/* Email Section */}
+                    <div className="mt-1">
+                      {editingEmail === owner.id ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="email"
+                            value={emailInput}
+                            onChange={(e) => setEmailInput(e.target.value)}
+                            placeholder="email@example.com"
+                            className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-foreground"
+                          />
+                          <button
+                            onClick={() => handleUpdateEmail(owner.id)}
+                            className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => { setEditingEmail(null); setEmailInput(""); }}
+                            className="text-xs px-2 py-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-400"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                            {owner.email || "No email set"}
+                          </span>
+                          <button
+                            onClick={() => { setEditingEmail(owner.id); setEmailInput(owner.email || ""); }}
+                            className="text-xs text-blue-500 hover:text-blue-600"
+                          >
+                            {owner.email ? "Edit" : "Add email"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {ownerCards.length} card{ownerCards.length !== 1 ? "s" : ""}
+                    </span>
+                    {owner.email && (
+                      <button
+                        onClick={() => handleSendEmail(owner.id)}
+                        disabled={sendingEmail === owner.id}
+                        className="flex items-center gap-1 px-3 py-1.5 text-sm bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:bg-gray-400 transition-colors"
+                      >
+                        {sendingEmail === owner.id ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            Send Reminder
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Owner's Cards */}

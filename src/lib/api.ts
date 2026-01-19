@@ -20,6 +20,8 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
 export interface Owner {
   id: string;
   name: string;
+  email: string | null;
+  notifications_enabled: boolean;
   created_at: string;
   cards: CardBasic[];
 }
@@ -156,6 +158,21 @@ export interface CardAnalysis {
   net_value: string;
 }
 
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatResponse {
+  response: string;
+  configured: boolean;
+}
+
+export interface AIStatus {
+  configured: boolean;
+  model: string | null;
+}
+
 // API functions
 export const api = {
   // Owners
@@ -165,8 +182,19 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ name }),
     }),
+  updateOwner: (id: string, data: { name?: string; email?: string; notifications_enabled?: boolean }) =>
+    fetchAPI<Owner>(`/owners/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
   deleteOwner: (id: string) =>
     fetchAPI(`/owners/${id}`, { method: "DELETE" }),
+
+  // Notifications
+  sendNotificationToOwner: (ownerId: string, type: string = "monthly_reminder") =>
+    fetchAPI<{ success: boolean; message: string }>(`/notifications/send/${ownerId}?notification_type=${type}`, {
+      method: "POST",
+    }),
 
   // Card Templates (all supported cards)
   getCardTemplates: () => fetchAPI<CardTemplate[]>("/card-templates/"),
@@ -261,5 +289,30 @@ export const api = {
   getCardAnalysis: (ownerId?: string) =>
     fetchAPI<CardAnalysis[]>(
       `/dashboard/card-analysis${ownerId ? `?owner_id=${ownerId}` : ""}`
+    ),
+
+  // AI
+  getAIStatus: () => fetchAPI<AIStatus>("/ai/status"),
+  chat: (ownerId: string, message: string, history?: ChatMessage[]) =>
+    fetchAPI<ChatResponse>("/ai/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        owner_id: ownerId,
+        message,
+        history,
+      }),
+    }),
+  getInsights: (ownerId: string) =>
+    fetchAPI<{ insights: string | null; configured: boolean }>("/ai/insights", {
+      method: "POST",
+      body: JSON.stringify({ owner_id: ownerId }),
+    }),
+  getCardRecommendation: (ownerId: string, category: string) =>
+    fetchAPI<{ category: string; recommendation: string; configured: boolean }>(
+      "/ai/recommend-card",
+      {
+        method: "POST",
+        body: JSON.stringify({ owner_id: ownerId, category }),
+      }
     ),
 };
