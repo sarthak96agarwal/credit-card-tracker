@@ -1,0 +1,44 @@
+{
+  "name": "Capital One Venture X",
+  "issuer": "Capital One",
+  "annual_fee": 395,
+  "color": "#1A1A1A",
+  "benefits": [
+    {
+      "name": "Capital One Travel Credit",
+      "value": 300,
+      "period": "ANNUAL",
+      "category": "Travel",
+      "description": "$300 annual travel credit for bookings made through Capital One Travel, valid on flights, hotels, and rental cars booked in the portal."
+    },
+    {
+      "name": "Capital One Anniversary Travel Credit",
+      "value": 100,
+      "period": "ANNUAL",
+      "category": "Travel",
+      "description": "$100 annual travel credit for bookings made through Capital One Travel, valid on flights, hotels, and rental cars booked in the portal."
+    }
+  ],
+  "multipliers": [
+    {
+      "category": "Hotels (Cap One Travel)",
+      "multiplier": 10,
+      "notes": "Booked through Capital One Travel"
+    },
+    {
+      "category": "Car Rentals (Cap One Travel)",
+      "multiplier": 10,
+      "notes": "Booked through Capital One Travel"
+    },
+    {
+      "category": "Flights (Cap One Travel)",
+      "multiplier": 5,
+      "notes": "Booked through Capital One Travel"
+    },
+    {
+      "category": "Everything Else",
+      "multiplier": 2,
+      "notes": null
+    }
+  ]
+}

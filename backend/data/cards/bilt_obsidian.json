@@ -1,0 +1,34 @@
+{
+  "name": "Bilt Mastercard",
+  "issuer": "Bilt Rewards",
+  "annual_fee": 495,
+  "color": "#000000",
+  "benefits": [
+    {
+      "name": "Bilt Travel Hotel Credit",
+      "value": 200,
+      "period": "SEMI_ANNUAL",
+      "category": "Travel",
+      "description": "$200 statement credit issued twice per year (total $400 annually) for qualifying hotel bookings made through the Bilt Travel Portal."
+    },
+    {
+      "name": "Bilt Cash",
+      "value": 200,
+      "period": "ANNUAL",
+      "category": "CashBack",
+      "description": "$200 of Bilt Cash awarded annually. Up to $100 of unused Bilt Cash rolls over into the next calendar year."
+    }
+  ],
+  "multipliers": [
+    {
+      "category": "Rent",
+      "multiplier": 1,
+      "notes": "Earn points on rent with no fee (up to 100k points/year)"
+    },
+    {
+      "category": "Everything Else",
+      "multiplier": 2,
+      "notes": "2x on everything"
+    }
+  ]
+}

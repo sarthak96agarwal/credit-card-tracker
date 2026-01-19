@@ -1,0 +1,102 @@
+{
+  "name": "Amex Platinum",
+  "issuer": "American Express",
+  "annual_fee": 895,
+  "color": "#E5E4E2",
+  "benefits": [
+    {
+      "name": "Uber One Credit",
+      "value": 120,
+      "period": "ANNUAL",
+      "category": "Rideshare",
+      "description": "Up to $120 in statement credits per calendar year on Uber One membership fees charged directly to an eligible U.S. Consumer Platinum Card (monthly or annual plan)."
+    },
+    {
+      "name": "Airline Fee Credit",
+      "value": 200,
+      "period": "ANNUAL",
+      "category": "Travel",
+      "description": "Up to $200 per calendar year in statement credits for incidental fees charged by your one selected qualifying airline (enrollment + airline selection required)."
+    },
+    {
+      "name": "Oura Ring Credit",
+      "value": 200,
+      "period": "ANNUAL",
+      "category": "Fitness",
+      "description": "Up to $200 per calendar year in statement credits on eligible Oura Ring purchases made online at ouraring.com (U.S. site)."
+    },
+    {
+      "name": "Uber Cash",
+      "value": 15,
+      "period": "MONTHLY",
+      "category": "Rideshare",
+      "description": "$15 Uber Cash each month plus an additional $20 in December (total $200/year). Monthly Uber Cash expires at 11:59 PM Hawaii time on the last day of each month."
+    },
+    {
+      "name": "CLEAR Plus Credit",
+      "value": 209,
+      "period": "ANNUAL",
+      "category": "Travel",
+      "description": "Up to $209 per calendar year in statement credits when you pay for an annual CLEAR Plus membership with the Platinum Card."
+    },
+    {
+      "name": "Digital Entertainment Credit",
+      "value": 25,
+      "period": "MONTHLY",
+      "category": "Streaming",
+      "description": "Up to $25 per month (up to $300/year) for eligible purchases: Disney+, ESPN+, Hulu, NYT, Paramount+, Peacock, WSJ, YouTube TV/Music/Premium. Enrollment required."
+    },
+    {
+      "name": "Equinox Credit",
+      "value": 300,
+      "period": "ANNUAL",
+      "category": "Fitness",
+      "description": "Up to $300 per calendar year in statement credits for U.S. eligible Equinox memberships or Equinox+ subscription."
+    },
+    {
+      "name": "lululemon Credit",
+      "value": 75,
+      "period": "QUARTERLY",
+      "category": "Shopping",
+      "description": "Up to $75 in statement credits each quarter (up to $300/year) on eligible lululemon purchases at U.S. stores or lululemon.com. Enrollment required."
+    },
+    {
+      "name": "Saks Credit",
+      "value": 50,
+      "period": "SEMI_ANNUAL",
+      "category": "Shopping",
+      "description": "$50 statement credit issued twice per year (total $100 annually) for purchases at Saks Fifth Avenue stores or saks.com. Enrollment required."
+    },
+    {
+      "name": "Resy Credit",
+      "value": 100,
+      "period": "QUARTERLY",
+      "category": "Dining",
+      "description": "Up to $100 in statement credits each quarter (up to $400/year) on eligible Resy purchases. Enrollment required."
+    },
+    {
+      "name": "Hotel Credit",
+      "value": 300,
+      "period": "SEMI_ANNUAL",
+      "category": "Travel",
+      "description": "Up to $300 in statement credits semi-annually (Jan-Jun and Jul-Dec), up to $600/year, for eligible prepaid Fine Hotels + Resorts and The Hotel Collection bookings."
+    }
+  ],
+  "multipliers": [
+    {
+      "category": "Flights",
+      "multiplier": 5,
+      "notes": "Booked directly with airlines or Amex Travel"
+    },
+    {
+      "category": "Hotels",
+      "multiplier": 5,
+      "notes": "Prepaid hotels via Amex Travel"
+    },
+    {
+      "category": "Everything Else",
+      "multiplier": 1,
+      "notes": null
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "name": "United Explorer Card",
+  "issuer": "Chase",
+  "annual_fee": 150,
+  "color": "#0033A0",
+  "benefits": [
+    {
+      "name": "United Hotels Credit",
+      "value": 100,
+      "period": "ANNUAL",
+      "category": "Travel",
+      "description": "Up to $100 in statement credits per account year ($50 on first eligible United Hotels stay and $50 on second eligible stay of $50+ each)."
+    },
+    {
+      "name": "Rideshare Statement Credit",
+      "value": 5,
+      "period": "MONTHLY",
+      "category": "Rideshare",
+      "description": "Up to $60 per calendar year in statement credits ($5 per month) on eligible rideshare purchases. Enrollment required each calendar year."
+    },
+    {
+      "name": "Avis & Budget Travel Credit",
+      "value": 50,
+      "period": "ANNUAL",
+      "category": "Travel",
+      "description": "Up to $50 per account year in United TravelBank cash ($25 after first eligible rental and $25 after second eligible rental) on Avis or Budget rentals booked via cars.united.com."
+    },
+    {
+      "name": "Instacart Credit",
+      "value": 10,
+      "period": "MONTHLY",
+      "category": "Grocery",
+      "description": "$10 Instacart credit each month (up to $120/year) with an active Instacart+ membership activated via Chase. Credit applies to one $10+ order per month."
+    },
+    {
+      "name": "United Club Passes",
+      "value": 59,
+      "period": "ANNUAL",
+      "category": "Travel",
+      "description": "2 one-time United Club passes per year (worth ~$59 each, $118 total but estimating usage of 1)."
+    }
+  ],
+  "multipliers": [
+    {
+      "category": "United Purchases",
+      "multiplier": 2,
+      "notes": "United flights and inflight purchases"
+    },
+    {
+      "category": "Dining",
+      "multiplier": 2,
+      "notes": null
+    },
+    {
+      "category": "Hotels",
+      "multiplier": 2,
+      "notes": null
+    },
+    {
+      "category": "Everything Else",
+      "multiplier": 1,
+      "notes": null
+    }
+  ]
+}

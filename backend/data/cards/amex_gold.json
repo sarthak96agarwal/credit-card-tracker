@@ -1,0 +1,58 @@
+{
+  "name": "Amex Gold",
+  "issuer": "American Express",
+  "annual_fee": 325,
+  "color": "#D4AF37",
+  "benefits": [
+    {
+      "name": "Resy Credit",
+      "value": 50,
+      "period": "SEMI_ANNUAL",
+      "category": "Dining",
+      "description": "Up to $50 in statement credits Jan-Jun and up to $50 Jul-Dec (total $100/year) on eligible Resy purchases. Enrollment required."
+    },
+    {
+      "name": "Dining Credit",
+      "value": 10,
+      "period": "MONTHLY",
+      "category": "Dining",
+      "description": "Up to $10 statement credit per month (total $120/year) at Grubhub/Seamless, The Cheesecake Factory, Goldbelly, Wine.com, and Five Guys. Enrollment required."
+    },
+    {
+      "name": "Uber Cash",
+      "value": 10,
+      "period": "MONTHLY",
+      "category": "Rideshare",
+      "description": "$10 Uber Cash each month (total $120/year). Monthly Uber Cash expires at 11:59 PM Hawaii time on the last day of each month."
+    },
+    {
+      "name": "Dunkin' Credit",
+      "value": 7,
+      "period": "MONTHLY",
+      "category": "Dining",
+      "description": "Up to $7 statement credit per month (total $84/year) on eligible Dunkin' purchases at U.S. Dunkin' locations. Enrollment required."
+    }
+  ],
+  "multipliers": [
+    {
+      "category": "Restaurants",
+      "multiplier": 4,
+      "notes": "Worldwide dining"
+    },
+    {
+      "category": "Groceries",
+      "multiplier": 4,
+      "notes": "US supermarkets, up to $25k/year"
+    },
+    {
+      "category": "Flights",
+      "multiplier": 3,
+      "notes": "Booked directly with airlines or Amex Travel"
+    },
+    {
+      "category": "Everything Else",
+      "multiplier": 1,
+      "notes": null
+    }
+  ]
+}

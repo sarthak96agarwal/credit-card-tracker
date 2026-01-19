@@ -1,0 +1,44 @@
+{
+  "name": "Amex Delta Gold",
+  "issuer": "American Express",
+  "annual_fee": 150,
+  "color": "#003366",
+  "benefits": [
+    {
+      "name": "Delta Stays Credit",
+      "value": 100,
+      "period": "ANNUAL",
+      "category": "Travel",
+      "description": "Up to $100 in statement credits per calendar year on new prepaid hotel or vacation rental bookings made through Delta Stays (delta.com/stays)."
+    },
+    {
+      "name": "Delta Flight Credit",
+      "value": 200,
+      "period": "ANNUAL",
+      "category": "Travel",
+      "description": "$200 Delta eCredit issued after $10,000+ in eligible purchases in a calendar year. Valid for Delta-marketed flights; expires 1 year from issuance."
+    }
+  ],
+  "multipliers": [
+    {
+      "category": "Delta Purchases",
+      "multiplier": 2,
+      "notes": "Delta flights"
+    },
+    {
+      "category": "Restaurants",
+      "multiplier": 2,
+      "notes": "Worldwide dining"
+    },
+    {
+      "category": "US Supermarkets",
+      "multiplier": 2,
+      "notes": null
+    },
+    {
+      "category": "Everything Else",
+      "multiplier": 1,
+      "notes": null
+    }
+  ]
+}
