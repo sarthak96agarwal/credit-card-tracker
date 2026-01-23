@@ -77,12 +77,13 @@ class NotificationService:
         """Get the remaining value of a benefit for the current period."""
         start, end = self.get_period_dates(benefit.period)
 
-        # Sum up usages in current period
+        # Sum up usages that overlap with current period
+        # A usage overlaps if: period_start <= end AND period_end >= start
         used = self.db.query(func.sum(BenefitUsage.used_amount)).filter(
             and_(
                 BenefitUsage.benefit_id == benefit.id,
-                BenefitUsage.period_start >= start,
-                BenefitUsage.period_end <= end
+                BenefitUsage.period_start <= end,
+                BenefitUsage.period_end >= start
             )
         ).scalar() or Decimal(0)
 
