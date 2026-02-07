@@ -78,6 +78,7 @@ export default function Dashboard() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [cardFilter, setCardFilter] = useState<CardFilter>("all");
   const [selectedBenefit, setSelectedBenefit] = useState<Benefit | null>(null);
+  const [selectedPeriodIndex, setSelectedPeriodIndex] = useState<number | null>(null);
 
   useEffect(() => {
     Promise.all([api.getOwners(), api.getCards()]).then(([ownersData, cardsData]) => {
@@ -110,19 +111,23 @@ export default function Dashboard() {
     });
   };
 
-  const handleUpdateUsage = async (benefit: Benefit, newTotalUsed: number) => {
+  const handleUpdateUsage = async (
+    benefit: Benefit,
+    newTotalUsed: number,
+    periodDates?: { start: Date; end: Date }
+  ) => {
     const period = benefit.period as BenefitPeriod;
-    const { start, end } = getCurrentPeriodDates(period);
+    const { start, end } = periodDates || getCurrentPeriodDates(period);
 
-    // Calculate current usage for this period
-    const currentPeriodUsages = benefit.usages.filter(
-      u => new Date(u.period_start) >= start && new Date(u.period_start) < end
+    // Calculate usage for this specific period
+    const periodUsages = benefit.usages.filter(
+      u => new Date(u.period_start) >= start && new Date(u.period_start) < new Date(end.getTime() + 86400000)
     );
-    const currentUsed = currentPeriodUsages.reduce((sum, u) => sum + parseFloat(u.used_amount), 0);
+    const currentUsed = periodUsages.reduce((sum, u) => sum + parseFloat(u.used_amount), 0);
 
-    // If reducing, delete all current usages and create new one
+    // If reducing, delete all period usages and create new one
     if (newTotalUsed < currentUsed) {
-      for (const usage of currentPeriodUsages) {
+      for (const usage of periodUsages) {
         await api.deleteBenefitUsage(usage.id);
       }
       if (newTotalUsed > 0) {
@@ -146,9 +151,10 @@ export default function Dashboard() {
 
     refreshBenefits();
     setSelectedBenefit(null);
+    setSelectedPeriodIndex(null);
   };
 
-  // Helper to get benefit status
+  // Helper to get benefit status for current period
   const getBenefitStatus = (benefit: Benefit) => {
     const period = benefit.period as BenefitPeriod;
     const { start, end } = getCurrentPeriodDates(period);
@@ -159,6 +165,17 @@ export default function Dashboard() {
     const daysRemaining = getDaysRemaining(end);
     const remaining = Math.max(0, parseFloat(benefit.value) - usedThisPeriod);
     return { isCompleted, daysRemaining, usedThisPeriod, remaining };
+  };
+
+  // Helper to count completed periods for this benefit
+  const getCompletedPeriodCount = (benefit: Benefit): number => {
+    const instances = getPeriodInstances(benefit);
+    return instances.filter(i => i.isCompleted).length;
+  };
+
+  // Helper to get total used across all periods
+  const getTotalUsedToDate = (benefit: Benefit): number => {
+    return benefit.usages.reduce((sum, u) => sum + parseFloat(u.used_amount), 0);
   };
 
   // Get unique cards for filter
@@ -173,7 +190,13 @@ export default function Dashboard() {
       if (timeFilter === "skipped") return benefit.is_skipped;
       if (timeFilter === "week" && (isCompleted || daysRemaining > 7 || benefit.is_skipped)) return false;
       if (timeFilter === "month" && (isCompleted || daysRemaining > 30 || benefit.is_skipped)) return false;
-      if (timeFilter === "completed" && !isCompleted) return false;
+      if (timeFilter === "completed") {
+        // Show benefits with at least one completed or missed past period
+        const instances = getPeriodInstances(benefit);
+        const hasHistory = instances.some(i => (i.isPast || i.isCurrent) && !(!i.isPast && !i.isCurrent));
+        const hasCompletedOrMissed = instances.some(i => i.isCompleted || (i.isPast && i.used < parseFloat(benefit.value)));
+        if (!hasCompletedOrMissed) return false;
+      }
       if (timeFilter === "all" && (isCompleted || benefit.is_skipped)) return false; // "Pending" shows only active pending
 
       // Card filter
@@ -319,7 +342,7 @@ export default function Dashboard() {
             { value: "all", label: "Pending" },
             { value: "week", label: "This Week", urgent: true },
             { value: "month", label: "This Month" },
-            { value: "completed", label: "Completed" },
+            { value: "completed", label: "History" },
             { value: "skipped", label: "Skipped" },
           ].map((filter) => (
             <button
@@ -358,16 +381,30 @@ export default function Dashboard() {
         <div className="text-center py-12 text-gray-500">Loading...</div>
       ) : filteredBenefits.length === 0 ? (
         <div className="text-center py-12 text-gray-500">
-          {timeFilter === "completed" ? "No completed benefits yet" : timeFilter === "skipped" ? "No skipped benefits" : "No benefits expiring in this timeframe"}
+          {timeFilter === "completed" ? "No benefit history yet" : timeFilter === "skipped" ? "No skipped benefits" : "No benefits expiring in this timeframe"}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredBenefits.map((benefit) => (
-            <BenefitCard
-              key={benefit.id}
-              benefit={benefit}
-              onClick={() => setSelectedBenefit(benefit)}
-            />
+            timeFilter === "completed" ? (
+              <CompletedBenefitCard
+                key={benefit.id}
+                benefit={benefit}
+                onPeriodClick={(b, periodIdx) => {
+                  setSelectedBenefit(b);
+                  setSelectedPeriodIndex(periodIdx);
+                }}
+              />
+            ) : (
+              <BenefitCard
+                key={benefit.id}
+                benefit={benefit}
+                onClick={() => {
+                  setSelectedBenefit(benefit);
+                  setSelectedPeriodIndex(null);
+                }}
+              />
+            )
           ))}
         </div>
       )}
@@ -376,9 +413,13 @@ export default function Dashboard() {
       {selectedBenefit && (
         <BenefitModal
           benefit={selectedBenefit}
-          onClose={() => setSelectedBenefit(null)}
+          onClose={() => {
+            setSelectedBenefit(null);
+            setSelectedPeriodIndex(null);
+          }}
           onUpdateUsage={handleUpdateUsage}
           onRefresh={refreshBenefits}
+          initialPeriodIndex={selectedPeriodIndex ?? undefined}
         />
       )}
 
@@ -498,33 +539,178 @@ function BenefitCard({ benefit, onClick }: { benefit: Benefit; onClick: () => vo
   );
 }
 
+function CompletedBenefitCard({
+  benefit,
+  onPeriodClick,
+}: {
+  benefit: Benefit;
+  onPeriodClick: (benefit: Benefit, periodIndex: number) => void;
+}) {
+  const periodInstances = getPeriodInstances(benefit);
+  const completedCount = periodInstances.filter(i => i.isCompleted).length;
+  const missedCount = periodInstances.filter(i => i.isPast && !i.isCompleted && i.used < parseFloat(benefit.value)).length;
+  const totalPeriods = periodInstances.length;
+  const totalUsed = benefit.usages.reduce((sum, u) => sum + parseFloat(u.used_amount), 0);
+  const totalMissed = periodInstances
+    .filter(i => i.isPast && !i.isCompleted)
+    .reduce((sum, i) => sum + Math.max(0, parseFloat(benefit.value) - i.used), 0);
+  const benefitValue = parseFloat(benefit.value);
+  const period = benefit.period as BenefitPeriod;
+  const periodLabel = period === "MONTHLY" ? "month" : period === "QUARTERLY" ? "quarter" : period === "SEMI_ANNUAL" ? "half" : "year";
+  const cardImage = getCardImage(benefit.card.name);
+  const hasMissed = missedCount > 0;
+
+  // Determine card border/bg color based on whether there are missed periods
+  const cardStyle = hasMissed
+    ? "bg-red-50 dark:bg-red-900/15 border-red-300 dark:border-red-800"
+    : "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800";
+
+  return (
+    <div className={`rounded-xl border-2 p-5 ${cardStyle}`}>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold leading-tight truncate text-gray-900 dark:text-gray-100">{benefit.name}</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{benefit.card.name}</p>
+        </div>
+        <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+          {cardImage && (
+            <div className="w-10 h-6 relative">
+              <Image
+                src={cardImage}
+                alt={benefit.card.name}
+                fill
+                className="object-contain rounded"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
+          )}
+          {hasMissed ? (
+            <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+              <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+          ) : (
+            <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+              <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Total earned + missed */}
+      <div className="mb-3">
+        <div className="flex items-baseline gap-3">
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+            {formatCurrency(totalUsed)}
+          </div>
+          {totalMissed > 0 && (
+            <div className="text-sm font-semibold text-red-500">
+              -{formatCurrency(totalMissed)} missed
+            </div>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {completedCount} earned{missedCount > 0 ? `, ${missedCount} missed` : ""} of {totalPeriods} {periodLabel}s
+        </p>
+      </div>
+
+      {/* Period bubbles grid */}
+      <div className="mb-3">
+        <div className={`grid gap-1 ${period === "MONTHLY" ? "grid-cols-6" : period === "QUARTERLY" ? "grid-cols-4" : period === "SEMI_ANNUAL" ? "grid-cols-2" : "grid-cols-1"}`}>
+          {periodInstances.map((instance, idx) => {
+            const hasUsage = instance.used > 0;
+            const isComplete = instance.isCompleted;
+            const isFuture = !instance.isPast && !instance.isCurrent;
+            const isMissed = instance.isPast && !isComplete;
+
+            return (
+              <button
+                key={idx}
+                onClick={() => !isFuture && onPeriodClick(benefit, idx)}
+                disabled={isFuture}
+                className={`p-1.5 rounded-lg text-center transition-colors ${
+                  isFuture
+                    ? "bg-gray-100 dark:bg-gray-800/50 text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                    : isComplete
+                    ? "bg-green-500 text-white hover:bg-green-600"
+                    : isMissed
+                    ? "bg-red-500 text-white hover:bg-red-600"
+                    : hasUsage
+                    ? "bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-400 hover:bg-orange-200"
+                    : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-300"
+                } ${instance.isCurrent ? "ring-2 ring-blue-500" : ""}`}
+              >
+                <div className="text-[10px] font-medium">{instance.label}</div>
+                <div className="text-[9px]">
+                  {isFuture ? "-" : isMissed && !hasUsage ? "Missed" : hasUsage ? formatCurrency(instance.used) : "-"}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-700">
+        <span className="text-xs text-gray-500">
+          {formatCurrency(benefitValue)}/{periodLabel}
+        </span>
+        <span className="text-xs text-gray-500">
+          Click to edit
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function BenefitModal({
   benefit,
   onClose,
   onUpdateUsage,
   onRefresh,
+  initialPeriodIndex,
 }: {
   benefit: Benefit;
   onClose: () => void;
-  onUpdateUsage: (benefit: Benefit, newTotalUsed: number) => void;
+  onUpdateUsage: (benefit: Benefit, newTotalUsed: number, periodDates?: { start: Date; end: Date }) => void;
   onRefresh: () => void;
+  initialPeriodIndex?: number;
 }) {
   const period = benefit.period as BenefitPeriod;
-  const { start, end } = getCurrentPeriodDates(period);
   const benefitValue = parseFloat(benefit.value);
-  const daysRemaining = getDaysRemaining(end);
-
-  // Current period usage
-  const currentPeriodUsages = benefit.usages.filter(
-    u => new Date(u.period_start) >= start && new Date(u.period_start) < end
-  );
-  const usedThisPeriod = currentPeriodUsages.reduce((sum, u) => sum + parseFloat(u.used_amount), 0);
-
-  const remaining = Math.max(0, benefitValue - usedThisPeriod);
-  const isCompleted = usedThisPeriod >= benefitValue;
 
   // Get all period instances for the year (hierarchical view)
   const periodInstances = getPeriodInstances(benefit);
+
+  // Find current period index
+  const currentPeriodIdx = periodInstances.findIndex(p => p.isCurrent);
+
+  // State for selected period (default to initial or current)
+  const [selectedPeriodIndex, setSelectedPeriodIndex] = useState(
+    initialPeriodIndex !== undefined ? initialPeriodIndex : (currentPeriodIdx >= 0 ? currentPeriodIdx : 0)
+  );
+
+  // Get selected period data
+  const selectedPeriod = periodInstances[selectedPeriodIndex];
+  const { start, end } = selectedPeriod ? { start: selectedPeriod.start, end: selectedPeriod.end } : getCurrentPeriodDates(period);
+  const daysRemaining = getDaysRemaining(end);
+  const isCurrentPeriod = selectedPeriod?.isCurrent ?? true;
+  const isPastPeriod = selectedPeriod?.isPast ?? false;
+
+  // Selected period usage
+  const selectedPeriodUsages = benefit.usages.filter(
+    u => new Date(u.period_start) >= start && new Date(u.period_start) < new Date(end.getTime() + 86400000)
+  );
+  const usedThisPeriod = selectedPeriodUsages.reduce((sum, u) => sum + parseFloat(u.used_amount), 0);
+
+  const remaining = Math.max(0, benefitValue - usedThisPeriod);
+  const isCompleted = usedThisPeriod >= benefitValue;
 
   const [inputValue, setInputValue] = useState(usedThisPeriod.toFixed(2));
   const [isEditing, setIsEditing] = useState(!isCompleted);
@@ -532,6 +718,20 @@ function BenefitModal({
   const [isAutoUse, setIsAutoUse] = useState(benefit.is_auto_use);
   const [updating, setUpdating] = useState(false);
   const cardImage = getCardImage(benefit.card.name);
+
+  // Update input value when period changes (but don't force editing state)
+  useEffect(() => {
+    const periodUsages = benefit.usages.filter(
+      u => new Date(u.period_start) >= periodInstances[selectedPeriodIndex].start &&
+           new Date(u.period_start) < new Date(periodInstances[selectedPeriodIndex].end.getTime() + 86400000)
+    );
+    const used = periodUsages.reduce((sum, u) => sum + parseFloat(u.used_amount), 0);
+    setInputValue(used.toFixed(2));
+    // Only auto-enable editing for incomplete periods, don't force disable for completed ones
+    if (used < benefitValue) {
+      setIsEditing(true);
+    }
+  }, [selectedPeriodIndex, benefit.usages, benefitValue, periodInstances]);
 
   const handleToggleSkipped = async () => {
     setUpdating(true);
@@ -560,17 +760,18 @@ function BenefitModal({
   const handleSubmit = () => {
     const newTotal = parseFloat(inputValue) || 0;
     if (newTotal !== usedThisPeriod && newTotal >= 0 && newTotal <= benefitValue) {
-      onUpdateUsage(benefit, newTotal);
+      onUpdateUsage(benefit, newTotal, { start, end });
     }
   };
 
   const handleMarkFullyUsed = () => {
-    onUpdateUsage(benefit, benefitValue);
+    onUpdateUsage(benefit, benefitValue, { start, end });
   };
 
   const handleReset = async () => {
-    if (confirm("Reset all usage for this period? This cannot be undone.")) {
-      for (const usage of currentPeriodUsages) {
+    const periodLabel = selectedPeriod?.label || "this period";
+    if (confirm(`Reset all usage for ${periodLabel}? This cannot be undone.`)) {
+      for (const usage of selectedPeriodUsages) {
         await api.deleteBenefitUsage(usage.id);
       }
       onRefresh();
@@ -661,13 +862,55 @@ function BenefitModal({
             </div>
           )}
 
-          {/* Current Period Status */}
+          {/* Period Selector */}
+          {!isSkipped && (
+          <div className="mb-4">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Select Period</h3>
+            <div className={`grid gap-1.5 ${period === "MONTHLY" ? "grid-cols-6" : period === "QUARTERLY" ? "grid-cols-4" : period === "SEMI_ANNUAL" ? "grid-cols-2" : "grid-cols-1"}`}>
+              {periodInstances.map((instance, idx) => {
+                const isSelected = idx === selectedPeriodIndex;
+                const hasUsage = instance.used > 0;
+                const isFuture = !instance.isPast && !instance.isCurrent;
+
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedPeriodIndex(idx)}
+                    disabled={isFuture}
+                    className={`p-1.5 rounded-lg text-center text-xs transition-all ${
+                      isSelected
+                        ? "ring-2 ring-blue-500 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400"
+                        : instance.isCompleted
+                        ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 hover:bg-green-200"
+                        : hasUsage
+                        ? "bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-400 hover:bg-orange-200"
+                        : isFuture
+                        ? "bg-gray-50 dark:bg-gray-800/30 text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200"
+                    }`}
+                  >
+                    <div className="font-medium">{instance.label}</div>
+                    <div className="text-[9px] mt-0.5">
+                      {hasUsage ? formatCurrency(instance.used) : "-"}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          )}
+
+          {/* Selected Period Status */}
           {!isSkipped && (
           <div className={`rounded-xl p-4 mb-4 ${urgencyColors.bg} border ${urgencyColors.border}`}>
             <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Current Period</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                {selectedPeriod?.label || "Period"} {isPastPeriod && <span className="text-gray-400">(Past)</span>}
+              </span>
               {isCompleted ? (
                 <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">Completed</span>
+              ) : isPastPeriod ? (
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">Expired</span>
               ) : daysRemaining <= 7 ? (
                 <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-semibold">⏰ {daysRemaining}d left</span>
               ) : daysRemaining <= 30 ? (
@@ -679,44 +922,16 @@ function BenefitModal({
             <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
               <div
                 className={`h-full ${
-                  isCompleted ? "bg-green-500" : daysRemaining <= 7 ? "bg-red-500" : daysRemaining <= 30 ? "bg-orange-500" : "bg-blue-500"
+                  isCompleted ? "bg-green-500" : isPastPeriod ? "bg-gray-400" : daysRemaining <= 7 ? "bg-red-500" : daysRemaining <= 30 ? "bg-orange-500" : "bg-blue-500"
                 }`}
                 style={{ width: `${Math.min((usedThisPeriod / benefitValue) * 100, 100)}%` }}
               />
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600 dark:text-gray-400">{formatCurrency(usedThisPeriod)} used</span>
-              <span className={`font-semibold ${!isCompleted && daysRemaining <= 7 ? "text-red-500" : "text-gray-900 dark:text-gray-100"}`}>
+              <span className={`font-semibold ${!isCompleted && !isPastPeriod && daysRemaining <= 7 ? "text-red-500" : "text-gray-900 dark:text-gray-100"}`}>
                 {formatCurrency(remaining)} to go
               </span>
-            </div>
-          </div>
-          )}
-
-          {/* Period History */}
-          {!isSkipped && (
-          <div className="mb-4">
-            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">This Year</h3>
-            <div className="grid grid-cols-4 gap-2">
-              {periodInstances.map((instance, idx) => (
-                <div
-                  key={idx}
-                  className={`p-2 rounded-lg text-center text-xs ${
-                    instance.isCompleted
-                      ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400"
-                      : instance.isCurrent
-                      ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 ring-2 ring-blue-500"
-                      : instance.isPast
-                      ? "bg-gray-100 dark:bg-gray-800 text-gray-400"
-                      : "bg-gray-50 dark:bg-gray-800/50 text-gray-400"
-                  }`}
-                >
-                  <div className="font-medium">{instance.label}</div>
-                  <div className="text-[10px] mt-0.5">
-                    {instance.isCompleted ? formatCurrency(instance.used) : instance.isCurrent ? `${formatCurrency(instance.used)}` : "-"}
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
           )}
@@ -834,7 +1049,7 @@ function getPeriodInstances(benefit: Benefit) {
         end,
         isCurrent,
         isPast,
-        isCompleted: used >= benefitValue,
+        isCompleted: (isCurrent || isPast) && used >= benefitValue,
         used,
       });
     }
@@ -858,7 +1073,7 @@ function getPeriodInstances(benefit: Benefit) {
         end,
         isCurrent,
         isPast,
-        isCompleted: used >= benefitValue,
+        isCompleted: (isCurrent || isPast) && used >= benefitValue,
         used,
       });
     }
@@ -882,7 +1097,7 @@ function getPeriodInstances(benefit: Benefit) {
         end,
         isCurrent,
         isPast,
-        isCompleted: used >= benefitValue,
+        isCompleted: (isCurrent || isPast) && used >= benefitValue,
         used,
       });
     }

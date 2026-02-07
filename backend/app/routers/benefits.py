@@ -5,6 +5,7 @@ from typing import List, Optional
 from app.database import get_db
 from app.models import Benefit
 from app.schemas import BenefitCreate, BenefitUpdate, BenefitResponse, BenefitWithUsage
+from app.utils import sync_auto_use_benefits
 
 router = APIRouter(prefix="/benefits", tags=["benefits"])
 
@@ -14,6 +15,9 @@ def get_benefits(
     card_id: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
+    # Sync auto-use benefits to ensure current month records exist
+    sync_auto_use_benefits(db)
+    
     query = db.query(Benefit).options(
         joinedload(Benefit.usages),
         joinedload(Benefit.card)

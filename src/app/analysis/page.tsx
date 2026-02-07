@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, CardAnalysis, Owner } from "@/lib/api";
-import { formatCurrency } from "@/lib/utils";
+import { api, Benefit, CardAnalysis, Owner } from "@/lib/api";
+import { formatCurrency, BenefitPeriod } from "@/lib/utils";
 import ChatWidget from "@/components/ChatWidget";
 
 export default function AnalysisPage() {
@@ -12,6 +12,7 @@ export default function AnalysisPage() {
   const [loading, setLoading] = useState(true);
   const [aiInsights, setAiInsights] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<CardAnalysis | null>(null);
 
   useEffect(() => {
     api.getOwners().then(setOwners);
@@ -139,7 +140,11 @@ export default function AnalysisPage() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {analysis.map((card) => (
-                <CardAnalysisCard key={card.id} card={card} />
+                <CardAnalysisCard
+                  key={card.id}
+                  card={card}
+                  onClick={() => setSelectedCard(card)}
+                />
               ))}
             </div>
           </div>
@@ -213,6 +218,14 @@ export default function AnalysisPage() {
         </>
       )}
 
+      {/* Card Detail Modal */}
+      {selectedCard && (
+        <CardDetailModal
+          card={selectedCard}
+          onClose={() => setSelectedCard(null)}
+        />
+      )}
+
       {/* AI Chat Widget */}
       {selectedOwner && (
         <ChatWidget
@@ -243,7 +256,7 @@ function SummaryCard({
   );
 }
 
-function CardAnalysisCard({ card }: { card: CardAnalysis }) {
+function CardAnalysisCard({ card, onClick }: { card: CardAnalysis; onClick: () => void }) {
   const netValue = parseFloat(card.net_value);
   const isPositive = netValue >= 0;
   const benefitsValue = parseFloat(card.total_benefits_value);
@@ -251,7 +264,10 @@ function CardAnalysisCard({ card }: { card: CardAnalysis }) {
   const annualFee = parseFloat(card.annual_fee);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+    <div
+      onClick={onClick}
+      className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden cursor-pointer hover:shadow-lg transition-all"
+    >
       {/* Color bar */}
       <div
         className="h-2"
@@ -314,6 +330,264 @@ function CardAnalysisCard({ card }: { card: CardAnalysis }) {
             <span>{formatCurrency(benefitsValue - benefitsUsed)} remaining</span>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Helper: compute per-benefit breakdown for a card
+interface BenefitBreakdown {
+  id: string;
+  name: string;
+  category: string;
+  period: BenefitPeriod;
+  periodLabel: string;
+  valuePerPeriod: number;
+  annualValue: number;
+  totalEarned: number;
+  totalMissed: number;
+  isSkipped: boolean;
+  isAutoUse: boolean;
+  periodsCompleted: number;
+  periodsMissed: number;
+  totalPastPeriods: number;
+}
+
+function computeBenefitBreakdowns(benefits: Benefit[]): BenefitBreakdown[] {
+  const now = new Date();
+  const year = now.getFullYear();
+
+  return benefits.map((benefit) => {
+    const period = benefit.period as BenefitPeriod;
+    const value = parseFloat(benefit.value);
+    const periodLabel =
+      period === "MONTHLY" ? "month" : period === "QUARTERLY" ? "quarter" : period === "SEMI_ANNUAL" ? "half" : "year";
+    const annualMultiplier = period === "MONTHLY" ? 12 : period === "QUARTERLY" ? 4 : period === "SEMI_ANNUAL" ? 2 : 1;
+    const annualValue = value * annualMultiplier;
+
+    // Generate past periods
+    let periodsCompleted = 0;
+    let periodsMissed = 0;
+    let totalEarned = 0;
+    let totalMissed = 0;
+    let totalPastPeriods = 0;
+
+    const getPeriodRanges = (): Array<{ start: Date; end: Date }> => {
+      const ranges: Array<{ start: Date; end: Date }> = [];
+      if (period === "MONTHLY") {
+        for (let m = 0; m <= now.getMonth(); m++) {
+          ranges.push({ start: new Date(year, m, 1), end: new Date(year, m + 1, 0) });
+        }
+      } else if (period === "QUARTERLY") {
+        const curQ = Math.floor(now.getMonth() / 3);
+        for (let q = 0; q <= curQ; q++) {
+          ranges.push({ start: new Date(year, q * 3, 1), end: new Date(year, q * 3 + 3, 0) });
+        }
+      } else if (period === "SEMI_ANNUAL") {
+        const curH = Math.floor(now.getMonth() / 6);
+        for (let h = 0; h <= curH; h++) {
+          ranges.push({ start: new Date(year, h * 6, 1), end: new Date(year, h * 6 + 6, 0) });
+        }
+      } else {
+        ranges.push({ start: new Date(year, 0, 1), end: new Date(year, 11, 31) });
+      }
+      return ranges;
+    };
+
+    const ranges = getPeriodRanges();
+
+    for (const range of ranges) {
+      const isPast = now > range.end;
+      const used = benefit.usages
+        .filter((u) => {
+          const uStart = new Date(u.period_start);
+          return uStart >= range.start && uStart <= range.end;
+        })
+        .reduce((sum, u) => sum + parseFloat(u.used_amount), 0);
+
+      totalEarned += used;
+
+      if (isPast) {
+        totalPastPeriods++;
+        if (used >= value) {
+          periodsCompleted++;
+        } else {
+          periodsMissed++;
+          totalMissed += value - used;
+        }
+      } else {
+        // Current period
+        if (used >= value) {
+          periodsCompleted++;
+          totalPastPeriods++;
+        }
+      }
+    }
+
+    return {
+      id: benefit.id,
+      name: benefit.name,
+      category: benefit.category,
+      period,
+      periodLabel,
+      valuePerPeriod: value,
+      annualValue,
+      totalEarned,
+      totalMissed,
+      isSkipped: benefit.is_skipped,
+      isAutoUse: benefit.is_auto_use,
+      periodsCompleted,
+      periodsMissed,
+      totalPastPeriods,
+    };
+  });
+}
+
+function CardDetailModal({
+  card,
+  onClose,
+}: {
+  card: CardAnalysis;
+  onClose: () => void;
+}) {
+  const [benefits, setBenefits] = useState<Benefit[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getBenefits(card.id).then((data) => {
+      setBenefits(data);
+      setLoading(false);
+    });
+  }, [card.id]);
+
+  const annualFee = parseFloat(card.annual_fee);
+  const breakdowns = computeBenefitBreakdowns(benefits);
+  const totalEarned = breakdowns.reduce((sum, b) => sum + b.totalEarned, 0);
+  const totalMissed = breakdowns.reduce((sum, b) => sum + b.totalMissed, 0);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-5 flex items-center justify-between z-10">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+              {card.name}
+            </h2>
+            <p className="text-sm text-gray-500">{card.issuer} • {card.owner_name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500"
+          >
+            ✕
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="p-8 text-center text-gray-500">Loading details...</div>
+        ) : (
+          <div className="p-5 space-y-6">
+            {/* Key Metrics */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 text-center">
+                <div className="text-xs text-gray-500 dark:text-gray-400">Earned YTD</div>
+                <div className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(totalEarned)}</div>
+              </div>
+              <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 text-center">
+                <div className="text-xs text-gray-500 dark:text-gray-400">Missed YTD</div>
+                <div className="text-lg font-bold text-red-500">{formatCurrency(totalMissed)}</div>
+              </div>
+            </div>
+
+            {/* Fee vs Earned Progress */}
+            {annualFee > 0 && (
+              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Break-Even Progress</span>
+                  <span className={`text-sm font-bold ${totalEarned >= annualFee ? "text-green-500" : "text-orange-500"}`}>
+                    {formatCurrency(totalEarned)} / {formatCurrency(annualFee)}
+                  </span>
+                </div>
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all rounded-full ${totalEarned >= annualFee ? "bg-green-500" : "bg-orange-500"}`}
+                    style={{ width: `${Math.min((totalEarned / annualFee) * 100, 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {totalEarned >= annualFee
+                    ? "✅ Annual fee covered!"
+                    : `${formatCurrency(annualFee - totalEarned)} more to break even`}
+                </p>
+              </div>
+            )}
+
+            {/* Benefit Breakdown */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Benefit Breakdown</h3>
+              <div className="space-y-2">
+                {breakdowns
+                  .sort((a, b) => b.totalEarned - a.totalEarned)
+                  .map((b) => {
+                    const utilizationPct = b.annualValue > 0 ? (b.totalEarned / b.annualValue) * 100 : 0;
+                    return (
+                      <div
+                        key={b.id}
+                        className={`rounded-lg border p-3 ${
+                          b.isSkipped
+                            ? "bg-gray-50 dark:bg-gray-800/30 border-gray-200 dark:border-gray-700 opacity-60"
+                            : b.totalMissed > 0
+                            ? "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800"
+                            : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{b.name}</span>
+                            {b.isAutoUse && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 font-medium">Auto</span>
+                            )}
+                            {b.isSkipped && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 font-medium">Skipped</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs">
+                            <span className="text-green-600 dark:text-green-400 font-semibold">{formatCurrency(b.totalEarned)}</span>
+                            {b.totalMissed > 0 && (
+                              <span className="text-red-500 font-semibold">-{formatCurrency(b.totalMissed)}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${b.totalMissed > 0 ? "bg-red-400" : "bg-green-500"}`}
+                              style={{ width: `${Math.min(utilizationPct, 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                            {formatCurrency(b.valuePerPeriod)}/{b.periodLabel} • {formatCurrency(b.annualValue)}/yr
+                          </span>
+                        </div>
+                        {b.periodsMissed > 0 && !b.isSkipped && (
+                          <p className="text-[10px] text-red-500 mt-1">
+                            Missed {b.periodsMissed} {b.periodLabel}{b.periodsMissed > 1 ? "s" : ""}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
