@@ -719,6 +719,9 @@ function BenefitModal({
   const [updating, setUpdating] = useState(false);
   const cardImage = getCardImage(benefit.card.name);
 
+  // Combined loading state - disable all actions when any operation is in progress
+  const isProcessing = updating;
+
   // Update input value when period changes (but don't force editing state)
   useEffect(() => {
     const periodUsages = benefit.usages.filter(
@@ -757,15 +760,25 @@ function BenefitModal({
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const newTotal = parseFloat(inputValue) || 0;
     if (newTotal !== usedThisPeriod && newTotal >= 0 && newTotal <= benefitValue) {
-      onUpdateUsage(benefit, newTotal, { start, end });
+      setUpdating(true);
+      try {
+        await onUpdateUsage(benefit, newTotal, { start, end });
+      } finally {
+        setUpdating(false);
+      }
     }
   };
 
-  const handleMarkFullyUsed = () => {
-    onUpdateUsage(benefit, benefitValue, { start, end });
+  const handleMarkFullyUsed = async () => {
+    setUpdating(true);
+    try {
+      await onUpdateUsage(benefit, benefitValue, { start, end });
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const handleReset = async () => {
@@ -820,7 +833,7 @@ function BenefitModal({
           <div className="flex gap-4 mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
             <button
               onClick={handleToggleSkipped}
-              disabled={updating}
+              disabled={isProcessing}
               className={`flex-1 flex items-center justify-between px-3 py-2 rounded-lg border transition-colors ${
                 isSkipped
                   ? "bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600"
@@ -834,7 +847,7 @@ function BenefitModal({
             </button>
             <button
               onClick={handleToggleAutoUse}
-              disabled={updating || isSkipped}
+              disabled={isProcessing || isSkipped}
               className={`flex-1 flex items-center justify-between px-3 py-2 rounded-lg border transition-colors ${
                 isAutoUse
                   ? "bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700"
@@ -962,22 +975,23 @@ function BenefitModal({
                       type="text"
                       inputMode="decimal"
                       value={inputValue}
+                      disabled={isAutoUse}
                       onChange={(e) => {
                         const val = e.target.value;
                         if (val === '' || /^\d*\.?\d*$/.test(val)) {
                           setInputValue(val);
                         }
                       }}
-                      className="w-full pl-7 pr-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full pl-7 pr-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
                       placeholder="0.00"
                     />
                   </div>
                   <button
                     onClick={handleSubmit}
-                    disabled={parseFloat(inputValue) === usedThisPeriod || parseFloat(inputValue) < 0 || parseFloat(inputValue) > benefitValue}
+                    disabled={isProcessing || isAutoUse || parseFloat(inputValue) === usedThisPeriod || parseFloat(inputValue) < 0 || parseFloat(inputValue) > benefitValue}
                     className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
                   >
-                    Update
+                    {isProcessing ? "Saving..." : "Update"}
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -988,15 +1002,17 @@ function BenefitModal({
                   {!isCompleted && (
                     <button
                       onClick={handleMarkFullyUsed}
-                      className="flex-1 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
+                      disabled={isProcessing || isAutoUse}
+                      className="flex-1 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
-                      Mark Fully Used ({formatCurrency(benefitValue)})
+                      {isProcessing ? "Saving..." : `Mark Fully Used (${formatCurrency(benefitValue)})`}
                     </button>
                   )}
                   {usedThisPeriod > 0 && (
                     <button
                       onClick={handleReset}
-                      className="px-4 py-2.5 border border-red-300 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50"
+                      disabled={isProcessing || isAutoUse}
+                      className="px-4 py-2.5 border border-red-300 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Reset
                     </button>
