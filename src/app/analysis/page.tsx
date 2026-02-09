@@ -461,8 +461,11 @@ function CardDetailModal({
   }, [card.id]);
 
   const annualFee = parseFloat(card.annual_fee);
+  const walletAnnualValue = parseFloat(card.wallet_annual_value);
+  const walletUsed = parseFloat(card.wallet_used);
   const breakdowns = computeBenefitBreakdowns(benefits);
-  const totalEarned = breakdowns.reduce((sum, b) => sum + b.totalEarned, 0);
+  const benefitsEarned = breakdowns.reduce((sum, b) => sum + b.totalEarned, 0);
+  const totalEarned = benefitsEarned + walletUsed;
   const totalMissed = breakdowns.reduce((sum, b) => sum + b.totalMissed, 0);
 
   return (
@@ -586,6 +589,36 @@ function CardDetailModal({
                   })}
               </div>
             </div>
+
+            {/* Wallet Section */}
+            {card.has_wallet && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Currency Wallet</h3>
+                <div className="rounded-lg border p-3 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Bilt Cash Redemptions</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-400 font-medium">Wallet</span>
+                    </div>
+                    <span className="text-green-600 dark:text-green-400 font-semibold text-xs">{formatCurrency(walletUsed)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-purple-500"
+                        style={{ width: `${walletAnnualValue > 0 ? Math.min((walletUsed / walletAnnualValue) * 100, 100) : 0}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                      {formatCurrency(walletAnnualValue)}/yr potential
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-purple-600 dark:text-purple-400 mt-1">
+                    Monthly redemption limits across all channels
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

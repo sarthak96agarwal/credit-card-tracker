@@ -156,6 +156,9 @@ export interface CardAnalysis {
   benefits_used: string;
   utilization_rate: number;
   net_value: string;
+  wallet_annual_value: string;
+  wallet_used: string;
+  has_wallet: boolean;
 }
 
 export interface ChatMessage {
@@ -171,6 +174,64 @@ export interface ChatResponse {
 export interface AIStatus {
   configured: boolean;
   model: string | null;
+}
+
+// Wallet types
+export interface MonthlyUsage {
+  month: number;
+  month_name: string;
+  used: string;
+  is_current: boolean;
+  is_past: boolean;
+  is_completed: boolean;
+}
+
+export interface ChannelStatus {
+  category: string;
+  monthly_limit: string;
+  description: string | null;
+  used_this_month: string;
+  remaining: string;
+  monthly_history: MonthlyUsage[];
+}
+
+export interface WalletTransaction {
+  id: string;
+  wallet_id: string;
+  amount: string;
+  transaction_type: string;
+  category: string | null;
+  description: string | null;
+  transaction_date: string;
+  created_at: string;
+}
+
+export interface WalletCardBasic {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface Wallet {
+  id: string;
+  owner_id: string;
+  card_id: string;
+  currency_name: string;
+  carryover_limit: string | null;
+  redemption_channels: Array<{
+    category: string;
+    monthly_limit: number;
+    description: string;
+  }> | null;
+  current_balance: string;
+  created_at: string;
+  card: WalletCardBasic | null;
+  transactions: WalletTransaction[];
+  monthly_channel_status: ChannelStatus[];
+  must_spend_by_year_end: string;
+  months_remaining: number;
+  max_spendable_this_year: string;
+  on_track: boolean;
 }
 
 // API functions
@@ -315,4 +376,41 @@ export const api = {
         body: JSON.stringify({ owner_id: ownerId, category }),
       }
     ),
+
+  // Wallets
+  getAllWallets: () =>
+    fetchAPI<Wallet[]>("/wallets/"),
+  getWalletsForOwner: (ownerId: string) =>
+    fetchAPI<Wallet[]>(`/wallets/owner/${ownerId}`),
+  getWallet: (walletId: string) =>
+    fetchAPI<Wallet>(`/wallets/${walletId}`),
+  createWallet: (data: {
+    owner_id: string;
+    card_id: string;
+    currency_name: string;
+    carryover_limit?: number;
+    redemption_channels?: Array<{
+      category: string;
+      monthly_limit: number;
+      description: string;
+    }>;
+    initial_balance?: number;
+  }) =>
+    fetchAPI<Wallet>("/wallets/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  addWalletTransaction: (walletId: string, data: {
+    amount: number;
+    transaction_type: string;
+    category?: string;
+    description?: string;
+    transaction_date?: string;
+  }) =>
+    fetchAPI<WalletTransaction>(`/wallets/${walletId}/transactions`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteWalletTransaction: (transactionId: string) =>
+    fetchAPI(`/wallets/transactions/${transactionId}`, { method: "DELETE" }),
 };

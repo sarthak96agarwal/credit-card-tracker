@@ -21,6 +21,7 @@ class CreditCard(Base):
     template = relationship("CardTemplate", back_populates="cards")
     benefits = relationship("Benefit", back_populates="card", cascade="all, delete-orphan")
     multipliers = relationship("PointMultiplier", back_populates="card", cascade="all, delete-orphan")
+    wallets = relationship("CurrencyWallet", back_populates="card", cascade="all, delete-orphan")
 
     # Convenience properties to access template data
     @property

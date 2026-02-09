@@ -6,7 +6,7 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.models import Owner, CreditCard, Benefit, BenefitUsage
+from app.models import Owner, CreditCard, Benefit, BenefitUsage, CurrencyWallet, CurrencyTransaction
 from app.models.benefit import BenefitPeriod
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -86,6 +86,11 @@ class CardAnalysis(BaseModel):
     benefits_used: Decimal
     utilization_rate: float
     net_value: Decimal
+    # Wallet data - wallet_annual_value is grants/credits received (e.g., $200 Bilt Cash),
+    # NOT redemption capacity (which is just spending limits, not actual value)
+    wallet_annual_value: Decimal = Decimal(0)
+    wallet_used: Decimal = Decimal(0)
+    has_wallet: bool = False
 
 
 @router.get("/stats", response_model=DashboardStats)
@@ -201,6 +206,36 @@ def get_card_analysis(
                 if year_start <= usage.used_at < year_end:
                     benefits_used += usage.used_amount
 
+        # Check for wallet associated with this card
+        wallet_annual_value = Decimal(0)  # Annual grants/credits received (actual value)
+        wallet_used = Decimal(0)  # Redemptions made this year
+        has_wallet = False
+
+        wallet = db.query(CurrencyWallet).filter(
+            CurrencyWallet.card_id == card.id
+        ).first()
+
+        if wallet:
+            has_wallet = True
+
+            # Get all wallet transactions this year
+            transactions = db.query(CurrencyTransaction).filter(
+                CurrencyTransaction.wallet_id == wallet.id
+            ).all()
+
+            for tx in transactions:
+                if tx.transaction_date.year == now.year:
+                    if tx.transaction_type in ("grant", "bonus", "credit"):
+                        # Count grants/credits as wallet value (actual money received)
+                        wallet_annual_value += abs(tx.amount)
+                    elif tx.transaction_type == "redemption":
+                        # Count redemptions as wallet usage
+                        wallet_used += abs(tx.amount)
+
+            # Add wallet grants to benefits (these are actual value like the $200 Bilt Cash grant)
+            total_benefits_value += wallet_annual_value
+            benefits_used += wallet_used
+
         utilization_rate = 0.0
         if total_benefits_value > 0:
             utilization_rate = float(benefits_used / total_benefits_value * 100)
@@ -217,7 +252,10 @@ def get_card_analysis(
             total_benefits_value=total_benefits_value,
             benefits_used=benefits_used,
             utilization_rate=round(utilization_rate, 1),
-            net_value=net_value
+            net_value=net_value,
+            wallet_annual_value=wallet_annual_value,
+            wallet_used=wallet_used,
+            has_wallet=has_wallet
         ))
 
     return sorted(analysis, key=lambda x: x.net_value, reverse=True)

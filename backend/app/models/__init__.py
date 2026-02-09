@@ -8,6 +8,8 @@ from .benefit_usage import BenefitUsage
 from .point_multiplier import PointMultiplier
 from .notification_preference import NotificationPreference
 from .notification_history import NotificationHistory
+from .currency_wallet import CurrencyWallet
+from .currency_transaction import CurrencyTransaction
 
 __all__ = [
     "Owner",
@@ -21,4 +23,6 @@ __all__ = [
     "PointMultiplier",
     "NotificationPreference",
     "NotificationHistory",
+    "CurrencyWallet",
+    "CurrencyTransaction",
 ]

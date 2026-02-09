@@ -1,4 +1,5 @@
 """Utility functions for the application."""
+import os
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 from sqlalchemy.orm import Session
@@ -6,6 +7,20 @@ from typing import List
 
 from app.models.benefit import Benefit, BenefitPeriod
 from app.models.benefit_usage import BenefitUsage
+
+
+def get_current_date() -> date:
+    """Get current date, supporting simulated dates for testing.
+
+    Set SIMULATED_DATE environment variable to override (format: YYYY-MM-DD).
+    """
+    simulated = os.getenv("SIMULATED_DATE")
+    if simulated:
+        try:
+            return datetime.strptime(simulated, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    return date.today()
 
 
 def get_period_dates(period: BenefitPeriod, reference_date: date = None) -> List[tuple[date, date]]:

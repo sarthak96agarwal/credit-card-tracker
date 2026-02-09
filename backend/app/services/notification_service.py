@@ -13,7 +13,9 @@ from app.models import (
     CreditCard,
     NotificationPreference,
     NotificationHistory,
-    BenefitPeriod
+    BenefitPeriod,
+    CurrencyWallet,
+    CurrencyTransaction
 )
 from app.services.email_service import email_service
 from app.services.ai_service import ai_service
@@ -139,10 +141,91 @@ class NotificationService:
 
         return expiring_benefits
 
+    def get_wallet_data_for_owner(self, owner_id: str) -> list:
+        """
+        Get currency wallet data for an owner.
+        Returns list of wallet dicts with balance and monthly redemption status.
+        """
+        today = date.today()
+        current_year = today.year
+        current_month = today.month
+
+        wallets = self.db.query(CurrencyWallet).filter(
+            CurrencyWallet.owner_id == owner_id
+        ).all()
+
+        wallet_data = []
+        for wallet in wallets:
+            # Get card info
+            card = self.db.query(CreditCard).filter(CreditCard.id == wallet.card_id).first()
+            if not card:
+                continue
+
+            # Get transactions
+            transactions = self.db.query(CurrencyTransaction).filter(
+                CurrencyTransaction.wallet_id == wallet.id
+            ).all()
+
+            # Calculate balance
+            balance = sum(float(t.amount) for t in transactions)
+
+            # Calculate year-end info
+            carryover_limit = float(wallet.carryover_limit or 0)
+            must_spend = max(0, balance - carryover_limit)
+            months_remaining = 12 - current_month + 1
+
+            # Calculate monthly channel status
+            channels = []
+            total_monthly_capacity = 0
+            total_remaining_this_month = 0
+
+            if wallet.redemption_channels:
+                for channel in wallet.redemption_channels:
+                    category = channel.get("category")
+                    monthly_limit = float(channel.get("monthly_limit", 0))
+                    total_monthly_capacity += monthly_limit
+
+                    # Calculate used this month for this category
+                    used_this_month = sum(
+                        abs(float(t.amount)) for t in transactions
+                        if t.category == category
+                        and t.transaction_type == "redemption"
+                        and t.transaction_date.year == current_year
+                        and t.transaction_date.month == current_month
+                    )
+
+                    remaining = max(0, monthly_limit - used_this_month)
+                    total_remaining_this_month += remaining
+
+                    channels.append({
+                        "category": category,
+                        "monthly_limit": monthly_limit,
+                        "used_this_month": used_this_month,
+                        "remaining": remaining,
+                        "is_maxed": remaining == 0
+                    })
+
+            # Only include if there's remaining capacity or balance needs attention
+            if total_remaining_this_month > 0 or must_spend > 0:
+                wallet_data.append({
+                    "wallet_id": wallet.id,
+                    "currency_name": wallet.currency_name,
+                    "card_name": card.name,
+                    "card_color": card.color,
+                    "balance": balance,
+                    "must_spend_by_year_end": must_spend,
+                    "months_remaining": months_remaining,
+                    "monthly_capacity": total_monthly_capacity,
+                    "remaining_this_month": total_remaining_this_month,
+                    "channels": channels
+                })
+
+        return wallet_data
+
     def get_unused_benefits_for_owner(self, owner_id: str) -> dict:
         """
         Get all unused benefits for an owner (for monthly reminder).
-        Returns dict with 'monthly' and 'yearly' sections, grouped by card.
+        Returns dict with 'monthly', 'yearly', and 'wallets' sections.
         """
         benefits = self.db.query(Benefit).join(CreditCard).filter(
             and_(
@@ -193,9 +276,13 @@ class NotificationService:
                     yearly_by_card[card_id] = card_info.copy()
                 yearly_by_card[card_id]["benefits"].append(benefit_info)
 
+        # Get wallet data
+        wallets = self.get_wallet_data_for_owner(owner_id)
+
         return {
             "monthly": list(monthly_by_card.values()),
-            "yearly": list(yearly_by_card.values())
+            "yearly": list(yearly_by_card.values()),
+            "wallets": wallets
         }
 
     def should_send_notification(
@@ -284,10 +371,11 @@ class NotificationService:
                 continue
 
             benefits_data = self.get_unused_benefits_for_owner(owner.id)
-            # Check if there are any benefits at all
+            # Check if there are any benefits or wallets with remaining capacity
             has_monthly = bool(benefits_data.get("monthly"))
             has_yearly = bool(benefits_data.get("yearly"))
-            if not has_monthly and not has_yearly:
+            has_wallets = bool(benefits_data.get("wallets"))
+            if not has_monthly and not has_yearly and not has_wallets:
                 stats["skipped"] += 1
                 continue
 
@@ -297,6 +385,7 @@ class NotificationService:
             ) + sum(
                 len(card["benefits"]) for card in benefits_data.get("yearly", [])
             )
+            wallet_count = len(benefits_data.get("wallets", []))
 
             # Generate AI insights
             ai_insights = None
@@ -322,7 +411,7 @@ class NotificationService:
                     notification_type="monthly_reminder",
                     channel="email",
                     status="sent",
-                    extra_data={"benefits_count": total_benefits}
+                    extra_data={"benefits_count": total_benefits, "wallet_count": wallet_count}
                 )
                 stats["sent"] += 1
             else:
@@ -388,7 +477,7 @@ class NotificationService:
                     notification_type=notification_type,
                     channel="email",
                     status="sent",
-                    metadata={"benefits_count": len(data["benefits"])}
+                    extra_data={"benefits_count": len(data["benefits"])}
                 )
                 stats["sent"] += 1
             else:

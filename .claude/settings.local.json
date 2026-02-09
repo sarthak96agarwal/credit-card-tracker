@@ -28,7 +28,8 @@
       "Bash(__NEW_LINE_782fc2948794b024__ echo -e \"\\\\n=== Testing Card Recommendation ===\")",
       "Bash(__NEW_LINE_7c1f8f1f445034bd__ echo \"=== Testing Insights ===\")",
       "Bash(__NEW_LINE_fdc703650d28873d__ echo \"Endpoints working!\")",
-      "Bash(lsof:*)"
+      "Bash(lsof:*)",
+      "Bash(xargs kill -9 sleep 2)"
     ]
   }
 }

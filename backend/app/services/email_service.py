@@ -111,6 +111,86 @@ class EmailService:
         </div>
         """
 
+    def _build_wallet_section(self, wallets: list) -> str:
+        """Build HTML for the currency wallets section."""
+        if not wallets:
+            return ""
+
+        wallet_tiles = ""
+        for w in wallets:
+            # Build channels list
+            channels_html = ""
+            for ch in w.get("channels", []):
+                if ch["is_maxed"]:
+                    status = '<span style="color: #10b981;">&#10003; Done</span>'
+                else:
+                    status = f'<span style="color: #3b82f6;">${ch["remaining"]:.0f} left</span>'
+
+                channels_html += f"""
+                <tr>
+                    <td style="padding: 6px 0; font-size: 14px; color: #374151;">{ch['category']}</td>
+                    <td style="padding: 6px 0; text-align: right; font-size: 14px;">{status}</td>
+                </tr>
+                """
+
+            # Year-end warning if needed
+            year_end_warning = ""
+            if w["must_spend_by_year_end"] > 0:
+                year_end_warning = f"""
+                <div style="background: #fef3c7; border-radius: 8px; padding: 12px; margin-top: 12px;">
+                    <div style="font-weight: 600; color: #92400e; font-size: 13px;">
+                        ⚠️ Must spend ${w['must_spend_by_year_end']:.0f} by Dec 31
+                    </div>
+                    <div style="color: #a16207; font-size: 12px; margin-top: 4px;">
+                        {w['months_remaining']} months left · ${w['monthly_capacity']:.0f}/month capacity
+                    </div>
+                </div>
+                """
+
+            wallet_tiles += f"""
+            <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 16px;">
+                <div style="background: {w['card_color']}; padding: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h3 style="margin: 0; color: white; font-size: 16px; font-weight: 600;">{w['currency_name']}</h3>
+                            <p style="margin: 4px 0 0 0; color: rgba(255,255,255,0.8); font-size: 13px;">{w['card_name']}</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="color: white; font-size: 20px; font-weight: 700;">${w['balance']:.0f}</div>
+                            <div style="color: rgba(255,255,255,0.8); font-size: 12px;">Balance</div>
+                        </div>
+                    </div>
+                </div>
+                <div style="padding: 16px;">
+                    <div style="font-weight: 600; color: #374151; font-size: 13px; margin-bottom: 8px; text-transform: uppercase;">
+                        This Month's Redemptions
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        {channels_html}
+                    </table>
+                    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                        <span style="font-weight: 600; color: #374151;">${w['remaining_this_month']:.0f}</span>
+                        <span style="color: #6b7280; font-size: 14px;"> remaining this month</span>
+                    </div>
+                    {year_end_warning}
+                </div>
+            </div>
+            """
+
+        return f"""
+        <div style="margin-bottom: 32px;">
+            <div style="display: flex; align-items: center; margin-bottom: 16px;">
+                <div style="background: #0891b2; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+                    CURRENCY WALLETS
+                </div>
+                <div style="margin-left: 12px; color: #6b7280; font-size: 14px;">
+                    {len(wallets)} wallet{'s' if len(wallets) != 1 else ''} with redemption capacity
+                </div>
+            </div>
+            {wallet_tiles}
+        </div>
+        """
+
     def _build_insights_section(self, insights: str) -> str:
         """Build HTML for the AI insights section."""
         import re
@@ -152,9 +232,10 @@ class EmailService:
         benefits_data: dict,
         ai_insights: Optional[str] = None
     ) -> bool:
-        """Send monthly reminder email with pending benefits grouped by card."""
+        """Send monthly reminder email with pending benefits and wallets grouped by card."""
         monthly_cards = benefits_data.get("monthly", [])
         yearly_cards = benefits_data.get("yearly", [])
+        wallets = benefits_data.get("wallets", [])
 
         # Count totals
         monthly_count = sum(len(c["benefits"]) for c in monthly_cards)
@@ -169,9 +250,15 @@ class EmailService:
             sum(b["remaining"] for b in c["benefits"])
             for c in yearly_cards
         )
-        total_value = monthly_value + yearly_value
+
+        # Include wallet remaining in total
+        wallet_remaining = sum(w.get("remaining_this_month", 0) for w in wallets)
+        total_value = monthly_value + yearly_value + wallet_remaining
 
         subject = f"Benefits Reminder: ${total_value:.0f} waiting to be used"
+
+        # Build wallet section
+        wallet_section = self._build_wallet_section(wallets) if wallets else ""
 
         # Build monthly section
         monthly_section = ""
@@ -248,6 +335,9 @@ class EmailService:
                 <!-- Benefits by Section -->
                 {monthly_section}
                 {yearly_section}
+
+                <!-- Currency Wallets -->
+                {wallet_section}
 
                 <!-- Footer -->
                 <div style="text-align: center; padding: 24px; color: #9ca3af; font-size: 12px;">

@@ -15,6 +15,7 @@ from app.routers import (
 )
 from app.routers.notifications import router as notifications_router
 from app.routers.ai import router as ai_router
+from app.routers.wallets import router as wallets_router
 from app.workers.scheduler import start_scheduler, shutdown_scheduler
 
 # Configure logging
@@ -64,6 +65,7 @@ app.include_router(multipliers_router)
 app.include_router(dashboard_router)
 app.include_router(notifications_router)
 app.include_router(ai_router)
+app.include_router(wallets_router)
 
 
 @app.get("/")

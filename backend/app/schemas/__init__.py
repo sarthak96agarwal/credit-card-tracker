@@ -12,6 +12,14 @@ from .notification import (
     NotificationStatsResponse,
     ExpiringBenefitInfo
 )
+from .currency_wallet import (
+    WalletCreate,
+    WalletResponse,
+    WalletWithDetails,
+    TransactionCreate,
+    TransactionResponse,
+    ChannelStatus
+)
 
 __all__ = [
     "OwnerCreate", "OwnerUpdate", "OwnerResponse", "OwnerWithCards",
@@ -23,4 +31,6 @@ __all__ = [
     "NotificationPreferenceUpdate", "NotificationPreferenceResponse",
     "NotificationHistoryResponse", "NotificationTriggerRequest",
     "NotificationStatsResponse", "ExpiringBenefitInfo",
+    "WalletCreate", "WalletResponse", "WalletWithDetails",
+    "TransactionCreate", "TransactionResponse", "ChannelStatus",
 ]

@@ -18,3 +18,4 @@ class Owner(Base):
     cards = relationship("CreditCard", back_populates="owner", cascade="all, delete-orphan")
     notification_preferences = relationship("NotificationPreference", back_populates="owner", uselist=False, cascade="all, delete-orphan")
     notification_history = relationship("NotificationHistory", back_populates="owner", cascade="all, delete-orphan")
+    wallets = relationship("CurrencyWallet", back_populates="owner", cascade="all, delete-orphan")

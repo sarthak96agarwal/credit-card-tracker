@@ -2,6 +2,7 @@
 import sys
 import json
 from pathlib import Path
+from datetime import date
 
 sys.path.insert(0, '.')
 
@@ -16,7 +17,9 @@ from app.models import (
     PointMultiplier,
     BenefitPeriod,
     NotificationPreference,
-    NotificationHistory
+    NotificationHistory,
+    CurrencyWallet,
+    CurrencyTransaction
 )
 from decimal import Decimal
 
@@ -39,25 +42,15 @@ def period_from_string(period_str: str) -> BenefitPeriod:
 
 def seed_from_json():
     """Seed database from JSON card files and owners file."""
-    # Create tables
+    # Drop all existing tables and recreate from scratch
+    print("Dropping all existing tables...")
+    Base.metadata.drop_all(bind=engine)
+    print("Creating tables...")
     Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
 
     try:
-        # Clear existing data (in correct order for foreign keys)
-        print("Clearing existing data...")
-        db.query(NotificationHistory).delete()
-        db.query(NotificationPreference).delete()
-        db.query(PointMultiplier).delete()
-        db.query(Benefit).delete()
-        db.query(CreditCard).delete()
-        db.query(TemplateMultiplier).delete()
-        db.query(TemplateBenefit).delete()
-        db.query(CardTemplate).delete()
-        db.query(Owner).delete()
-        db.commit()
-
         # Track stats
         templates_created = 0
         template_benefits_created = 0
@@ -66,6 +59,11 @@ def seed_from_json():
         cards_created = 0
         benefits_created = 0
         multipliers_created = 0
+        wallets_created = 0
+        wallet_transactions_created = 0
+
+        # Store wallet config from templates
+        template_wallet_configs = {}  # slug -> wallet config
 
         # Step 1: Load all card templates
         if not CARDS_DIR.exists():
@@ -124,6 +122,10 @@ def seed_from_json():
                 )
                 db.add(template_multiplier)
                 template_multipliers_created += 1
+
+            # Store wallet config if present
+            if "currency_wallet" in card_data:
+                template_wallet_configs[slug] = card_data["currency_wallet"]
 
             db.commit()
 
@@ -210,6 +212,42 @@ def seed_from_json():
                     db.add(multiplier)
                     multipliers_created += 1
 
+                # Create currency wallet if template has wallet config
+                if card_slug in template_wallet_configs:
+                    wallet_config = template_wallet_configs[card_slug]
+                    print(f"      Creating wallet: {wallet_config['name']}")
+
+                    wallet = CurrencyWallet(
+                        owner_id=owner.id,
+                        card_id=card.id,
+                        currency_name=wallet_config["name"],
+                        carryover_limit=Decimal(str(wallet_config.get("carryover_limit", 0))) if wallet_config.get("carryover_limit") else None,
+                        redemption_channels=wallet_config.get("redemption_channels")
+                    )
+                    db.add(wallet)
+                    db.commit()
+                    db.refresh(wallet)
+                    wallets_created += 1
+
+                    # Create annual grant transactions that would have occurred this year
+                    current_year = date.today().year
+                    current_month = date.today().month
+
+                    for grant in wallet_config.get("annual_grants", []):
+                        grant_month = grant.get("month", 1)
+                        # Only create grants for months that have passed (or current month)
+                        if grant_month <= current_month:
+                            grant_date = date(current_year, grant_month, 1)
+                            transaction = CurrencyTransaction(
+                                wallet_id=wallet.id,
+                                amount=Decimal(str(grant["amount"])),
+                                transaction_type="grant",
+                                description=grant.get("description", "Annual grant"),
+                                transaction_date=grant_date
+                            )
+                            db.add(transaction)
+                            wallet_transactions_created += 1
+
                 db.commit()
 
         print("\n" + "=" * 60)
@@ -222,6 +260,8 @@ def seed_from_json():
         print(f"  - Owner Cards: {cards_created}")
         print(f"  - Card Benefits: {benefits_created}")
         print(f"  - Card Multipliers: {multipliers_created}")
+        print(f"  - Currency Wallets: {wallets_created}")
+        print(f"  - Wallet Transactions: {wallet_transactions_created}")
         print("=" * 60)
 
     except Exception as e:

@@ -11,13 +11,6 @@
       "period": "SEMI_ANNUAL",
       "category": "Travel",
       "description": "$200 statement credit issued twice per year (total $400 annually) for qualifying hotel bookings made through the Bilt Travel Portal."
-    },
-    {
-      "name": "Bilt Cash",
-      "value": 200,
-      "period": "ANNUAL",
-      "category": "CashBack",
-      "description": "$200 of Bilt Cash awarded annually. Up to $100 of unused Bilt Cash rolls over into the next calendar year."
     }
   ],
   "multipliers": [
@@ -31,5 +24,19 @@
       "multiplier": 2,
       "notes": "2x on everything"
     }
-  ]
+  ],
+  "currency_wallet": {
+    "name": "Bilt Cash",
+    "carryover_limit": 100,
+    "annual_grants": [
+      { "amount": 200, "month": 1, "description": "Annual Bilt Cash Award" }
+    ],
+    "redemption_channels": [
+      { "category": "Hotel", "monthly_limit": 50, "description": "Bilt Travel Portal hotel credit" },
+      { "category": "Dining", "monthly_limit": 25, "description": "Select Bilt Dining partners" },
+      { "category": "Fitness", "monthly_limit": 40, "description": "Barry's, Soulcycle, etc." },
+      { "category": "Lyft", "monthly_limit": 10, "description": "Lyft ride credit" },
+      { "category": "Walgreens", "monthly_limit": 10, "description": "Walgreens credit" }
+    ]
+  }
 }
