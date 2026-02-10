@@ -262,6 +262,7 @@ function CardAnalysisCard({ card, onClick }: { card: CardAnalysis; onClick: () =
   const benefitsValue = parseFloat(card.total_benefits_value);
   const benefitsUsed = parseFloat(card.benefits_used);
   const annualFee = parseFloat(card.annual_fee);
+  const feeCovered = annualFee > 0 && benefitsUsed >= annualFee;
 
   return (
     <div
@@ -275,6 +276,16 @@ function CardAnalysisCard({ card, onClick }: { card: CardAnalysis; onClick: () =
       />
 
       <div className="p-5">
+        {/* Fee Covered Badge */}
+        {feeCovered && (
+          <div className="flex items-center gap-1.5 mb-3 px-2.5 py-1.5 bg-green-100 dark:bg-green-900/40 rounded-lg w-fit">
+            <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-xs font-semibold text-green-700 dark:text-green-400">Fee Covered</span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div>

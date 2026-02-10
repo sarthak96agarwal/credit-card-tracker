@@ -413,38 +413,75 @@ export default function Dashboard() {
           {timeFilter === "completed" ? "No benefit history yet" : timeFilter === "skipped" ? "No skipped benefits" : "No benefits expiring in this timeframe"}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredBenefits.map((benefit) => (
-            benefit.benefit_type === "UNLIMITED_USE" ? (
-              <UnlimitedBenefitCard
-                key={benefit.id}
-                benefit={benefit}
-                onAddUsage={() => {
-                  setSelectedBenefit(benefit);
-                  setSelectedPeriodIndex(null);
-                }}
-                onRefresh={refreshBenefits}
-              />
-            ) : timeFilter === "completed" ? (
-              <CompletedBenefitCard
-                key={benefit.id}
-                benefit={benefit}
-                onPeriodClick={(b, periodIdx) => {
-                  setSelectedBenefit(b);
-                  setSelectedPeriodIndex(periodIdx);
-                }}
-              />
-            ) : (
-              <BenefitCard
-                key={benefit.id}
-                benefit={benefit}
-                onClick={() => {
-                  setSelectedBenefit(benefit);
-                  setSelectedPeriodIndex(null);
-                }}
-              />
-            )
-          ))}
+        <div className="space-y-6">
+          {/* Group benefits by category */}
+          {(() => {
+            // Group filtered benefits by category
+            const groupedByCategory = filteredBenefits.reduce((acc, benefit) => {
+              const category = benefit.category || "Other";
+              if (!acc[category]) acc[category] = [];
+              acc[category].push(benefit);
+              return acc;
+            }, {} as Record<string, Benefit[]>);
+
+            // Sort categories: put categories with urgent benefits first
+            const sortedCategories = Object.keys(groupedByCategory).sort((a, b) => {
+              const aHasUrgent = groupedByCategory[a].some(ben => {
+                if (ben.benefit_type === "UNLIMITED_USE") return false;
+                const { daysRemaining, isCompleted } = getBenefitStatus(ben);
+                return !isCompleted && daysRemaining <= 7;
+              });
+              const bHasUrgent = groupedByCategory[b].some(ben => {
+                if (ben.benefit_type === "UNLIMITED_USE") return false;
+                const { daysRemaining, isCompleted } = getBenefitStatus(ben);
+                return !isCompleted && daysRemaining <= 7;
+              });
+              if (aHasUrgent && !bHasUrgent) return -1;
+              if (!aHasUrgent && bHasUrgent) return 1;
+              return a.localeCompare(b);
+            });
+
+            return sortedCategories.map((category) => (
+              <div key={category}>
+                <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+                  {category}
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {groupedByCategory[category].map((benefit) => (
+                    benefit.benefit_type === "UNLIMITED_USE" ? (
+                      <UnlimitedBenefitCard
+                        key={benefit.id}
+                        benefit={benefit}
+                        onAddUsage={() => {
+                          setSelectedBenefit(benefit);
+                          setSelectedPeriodIndex(null);
+                        }}
+                        onRefresh={refreshBenefits}
+                      />
+                    ) : timeFilter === "completed" ? (
+                      <CompletedBenefitCard
+                        key={benefit.id}
+                        benefit={benefit}
+                        onPeriodClick={(b, periodIdx) => {
+                          setSelectedBenefit(b);
+                          setSelectedPeriodIndex(periodIdx);
+                        }}
+                      />
+                    ) : (
+                      <BenefitCard
+                        key={benefit.id}
+                        benefit={benefit}
+                        onClick={() => {
+                          setSelectedBenefit(benefit);
+                          setSelectedPeriodIndex(null);
+                        }}
+                      />
+                    )
+                  ))}
+                </div>
+              </div>
+            ));
+          })()}
         </div>
       )}
 
