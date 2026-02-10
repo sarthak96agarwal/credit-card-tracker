@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from app.database import get_db
 from app.models import Owner, CreditCard, Benefit, BenefitUsage, CurrencyWallet, CurrencyTransaction
-from app.models.benefit import BenefitPeriod
+from app.models.benefit import BenefitPeriod, BenefitType
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -113,13 +113,20 @@ def get_dashboard_stats(
 
     for card in cards:
         for benefit in card.benefits:
-            annual_value = get_annual_value(benefit.value, benefit.period)
-            total_benefits_value += annual_value
-
-            period_start, period_end = get_period_dates(benefit.period)
-            for usage in benefit.usages:
-                if period_start <= usage.period_start < period_end:
+            # Skip unlimited-use benefits from annual value calculation
+            if benefit.benefit_type == BenefitType.UNLIMITED_USE:
+                # For unlimited benefits, just count usage (no fixed annual value)
+                for usage in benefit.usages:
                     benefits_used_this_period += usage.used_amount
+            else:
+                # Period-capped benefits
+                annual_value = get_annual_value(benefit.value, benefit.period)
+                total_benefits_value += annual_value
+
+                period_start, period_end = get_period_dates(benefit.period)
+                for usage in benefit.usages:
+                    if period_start <= usage.period_start < period_end:
+                        benefits_used_this_period += usage.used_amount
 
     utilization_rate = 0.0
     if total_benefits_value > 0:
@@ -151,6 +158,10 @@ def get_expiring_benefits(
     expiring = []
 
     for benefit in benefits:
+        # Skip unlimited-use benefits - they don't expire
+        if benefit.benefit_type == BenefitType.UNLIMITED_USE:
+            continue
+
         period_start, period_end = get_period_dates(benefit.period)
 
         # Check if benefit is used this period
@@ -199,12 +210,21 @@ def get_card_analysis(
         benefits_used = Decimal(0)
 
         for benefit in card.benefits:
-            annual_value = get_annual_value(benefit.value, benefit.period)
-            total_benefits_value += annual_value
+            # Skip unlimited-use benefits from annual value calculation
+            # (they have no fixed annual value - value depends on usage)
+            if benefit.benefit_type == BenefitType.UNLIMITED_USE:
+                # For unlimited benefits, just count actual usage
+                for usage in benefit.usages:
+                    if year_start <= usage.used_at < year_end:
+                        benefits_used += usage.used_amount
+            else:
+                # Period-capped benefits: add to annual value and track usage
+                annual_value = get_annual_value(benefit.value, benefit.period)
+                total_benefits_value += annual_value
 
-            for usage in benefit.usages:
-                if year_start <= usage.used_at < year_end:
-                    benefits_used += usage.used_amount
+                for usage in benefit.usages:
+                    if year_start <= usage.used_at < year_end:
+                        benefits_used += usage.used_amount
 
         # Check for wallet associated with this card
         wallet_annual_value = Decimal(0)  # Annual grants/credits received (actual value)

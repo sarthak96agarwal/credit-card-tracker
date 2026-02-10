@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Optional
 from decimal import Decimal
-from app.models.benefit import BenefitPeriod
+from app.models.benefit import BenefitPeriod, BenefitType
 
 
 class BenefitCreate(BaseModel):
@@ -12,6 +12,7 @@ class BenefitCreate(BaseModel):
     period: BenefitPeriod
     category: str
     description: Optional[str] = None
+    benefit_type: BenefitType = BenefitType.PERIOD_CAPPED
     is_skipped: bool = False
     is_auto_use: bool = False
 
@@ -22,6 +23,7 @@ class BenefitUpdate(BaseModel):
     period: Optional[BenefitPeriod] = None
     category: Optional[str] = None
     description: Optional[str] = None
+    benefit_type: Optional[BenefitType] = None
     is_skipped: Optional[bool] = None
     is_auto_use: Optional[bool] = None
 
@@ -34,6 +36,7 @@ class BenefitResponse(BaseModel):
     period: BenefitPeriod
     category: str
     description: Optional[str]
+    benefit_type: BenefitType
     is_skipped: bool
     is_auto_use: bool
     created_at: datetime

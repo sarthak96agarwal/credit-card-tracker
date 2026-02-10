@@ -14,6 +14,11 @@ class BenefitPeriod(str, enum.Enum):
     ANNUAL = "ANNUAL"
 
 
+class BenefitType(str, enum.Enum):
+    PERIOD_CAPPED = "PERIOD_CAPPED"    # Fixed value per period (e.g., $200/year)
+    UNLIMITED_USE = "UNLIMITED_USE"    # Per-use value, no cap (e.g., $35/bag)
+
+
 class Benefit(Base):
     __tablename__ = "benefits"
 
@@ -24,6 +29,7 @@ class Benefit(Base):
     period = Column(Enum(BenefitPeriod), nullable=False)
     category = Column(String, nullable=False)
     description = Column(String, nullable=True)
+    benefit_type = Column(Enum(BenefitType), default=BenefitType.PERIOD_CAPPED, nullable=False)
     is_skipped = Column(Boolean, default=False, nullable=False)  # User doesn't use this benefit
     is_auto_use = Column(Boolean, default=False, nullable=False)  # Benefit is automatically used each period
     created_at = Column(DateTime, default=datetime.utcnow)

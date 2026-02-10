@@ -160,11 +160,14 @@ export default function ManagePage() {
                 </div>
                 {/* Total benefit value */}
                 <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  ~${template.template_benefits.reduce((sum, b) => {
-                    const value = parseFloat(b.value);
-                    const multiplier = b.period === "MONTHLY" ? 12 : b.period === "QUARTERLY" ? 4 : b.period === "SEMI_ANNUAL" ? 2 : 1;
-                    return sum + value * multiplier;
-                  }, 0).toFixed(0)}/yr in benefits
+                  ~${template.template_benefits
+                    .filter(b => b.benefit_type !== "UNLIMITED_USE")
+                    .reduce((sum, b) => {
+                      const value = parseFloat(b.value);
+                      const multiplier = b.period === "MONTHLY" ? 12 : b.period === "QUARTERLY" ? 4 : b.period === "SEMI_ANNUAL" ? 2 : 1;
+                      return sum + value * multiplier;
+                    }, 0).toFixed(0)}/yr in benefits
+                  {template.template_benefits.some(b => b.benefit_type === "UNLIMITED_USE") && " + unlimited"}
                 </div>
                 <div className="mt-2 text-xs text-blue-500 dark:text-blue-400">
                   Click for details →
@@ -356,13 +359,18 @@ function CardTemplateModal({
   template: CardTemplate;
   onClose: () => void;
 }) {
-  const totalAnnualValue = template.template_benefits.reduce((sum, b) => {
+  // Only count period-capped benefits for annual value (unlimited benefits are variable)
+  const periodCappedBenefits = template.template_benefits.filter(b => b.benefit_type !== "UNLIMITED_USE");
+  const unlimitedBenefits = template.template_benefits.filter(b => b.benefit_type === "UNLIMITED_USE");
+
+  const totalAnnualValue = periodCappedBenefits.reduce((sum, b) => {
     const value = parseFloat(b.value);
     const multiplier = b.period === "MONTHLY" ? 12 : b.period === "QUARTERLY" ? 4 : b.period === "SEMI_ANNUAL" ? 2 : 1;
     return sum + value * multiplier;
   }, 0);
 
   const netValue = totalAnnualValue - parseFloat(template.annual_fee);
+  const hasUnlimited = unlimitedBenefits.length > 0;
 
   return (
     <div
@@ -403,7 +411,9 @@ function CardTemplateModal({
               </div>
               <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center">
                 <div className="text-xs text-gray-500 dark:text-gray-400">Benefits Value</div>
-                <div className="text-lg font-bold text-green-500">${totalAnnualValue.toFixed(0)}</div>
+                <div className="text-lg font-bold text-green-500">
+                  ${totalAnnualValue.toFixed(0)}{hasUnlimited && "+"}
+                </div>
               </div>
               <div className={`${netValue >= 0 ? "bg-green-50 dark:bg-green-900/20" : "bg-red-50 dark:bg-red-900/20"} rounded-lg p-3 text-center`}>
                 <div className="text-xs text-gray-500 dark:text-gray-400">Net Value</div>
@@ -425,16 +435,25 @@ function CardTemplateModal({
             </h3>
             <div className="space-y-2">
               {template.template_benefits.map((benefit) => {
+                const isUnlimited = benefit.benefit_type === "UNLIMITED_USE";
                 const annualValue = parseFloat(benefit.value) *
                   (benefit.period === "MONTHLY" ? 12 : benefit.period === "QUARTERLY" ? 4 : benefit.period === "SEMI_ANNUAL" ? 2 : 1);
+
                 return (
                   <div
                     key={benefit.id}
-                    className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3"
+                    className={`rounded-lg p-3 ${isUnlimited ? "bg-purple-50 dark:bg-purple-900/20" : "bg-gray-50 dark:bg-gray-800"}`}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-foreground text-sm">{benefit.name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-foreground text-sm">{benefit.name}</span>
+                          {isUnlimited && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-400 font-medium">
+                              Unlimited
+                            </span>
+                          )}
+                        </div>
                         {benefit.description && (
                           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
                             {benefit.description}
@@ -442,13 +461,21 @@ function CardTemplateModal({
                         )}
                       </div>
                       <div className="text-right ml-3 flex-shrink-0">
-                        <div className="text-sm font-semibold text-green-600 dark:text-green-400">
-                          ${parseFloat(benefit.value).toFixed(0)}/{formatPeriod(benefit.period)}
-                        </div>
-                        {benefit.period !== "ANNUAL" && (
-                          <div className="text-xs text-gray-400">
-                            ${annualValue.toFixed(0)}/yr
+                        {isUnlimited ? (
+                          <div className="text-sm font-semibold text-purple-600 dark:text-purple-400">
+                            ${parseFloat(benefit.value).toFixed(0)}/use
                           </div>
+                        ) : (
+                          <>
+                            <div className="text-sm font-semibold text-green-600 dark:text-green-400">
+                              ${parseFloat(benefit.value).toFixed(0)}/{formatPeriod(benefit.period)}
+                            </div>
+                            {benefit.period !== "ANNUAL" && (
+                              <div className="text-xs text-gray-400">
+                                ${annualValue.toFixed(0)}/yr
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

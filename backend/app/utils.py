@@ -5,7 +5,7 @@ from dateutil.relativedelta import relativedelta
 from sqlalchemy.orm import Session
 from typing import List
 
-from app.models.benefit import Benefit, BenefitPeriod
+from app.models.benefit import Benefit, BenefitPeriod, BenefitType
 from app.models.benefit_usage import BenefitUsage
 
 
@@ -85,8 +85,11 @@ def sync_auto_use_benefits(db: Session) -> dict:
     Returns:
         Dictionary with stats about created records
     """
-    # Find all auto-use benefits
-    auto_benefits = db.query(Benefit).filter(Benefit.is_auto_use == True).all()
+    # Find all auto-use benefits (skip unlimited-use benefits - they track per-use amounts)
+    auto_benefits = db.query(Benefit).filter(
+        Benefit.is_auto_use == True,
+        Benefit.benefit_type != BenefitType.UNLIMITED_USE
+    ).all()
     
     created_count = 0
     skipped_count = 0

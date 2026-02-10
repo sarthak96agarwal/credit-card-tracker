@@ -39,6 +39,14 @@
       "period": "ANNUAL",
       "category": "Travel",
       "description": "2 one-time United Club passes per year (worth ~$59 each, $118 total but estimating usage of 1)."
+    },
+    {
+      "name": "Free First Checked Bag",
+      "value": 35,
+      "period": "ANNUAL",
+      "benefit_type": "UNLIMITED_USE",
+      "category": "Travel",
+      "description": "First checked bag free on United flights for cardholder and companions on same reservation."
     }
   ],
   "multipliers": [

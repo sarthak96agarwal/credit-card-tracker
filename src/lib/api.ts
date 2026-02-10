@@ -52,6 +52,7 @@ export interface TemplateBenefit {
   period: string;
   category: string;
   description: string | null;
+  benefit_type?: "PERIOD_CAPPED" | "UNLIMITED_USE";
 }
 
 export interface TemplateMultiplier {
@@ -84,6 +85,7 @@ export interface BenefitBasic {
   value: string;
   period: string;
   category: string;
+  benefit_type?: "PERIOD_CAPPED" | "UNLIMITED_USE";
   is_skipped?: boolean;
   is_auto_use?: boolean;
 }
@@ -102,6 +104,7 @@ export interface Benefit {
   period: "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "ANNUAL";
   category: string;
   description: string | null;
+  benefit_type: "PERIOD_CAPPED" | "UNLIMITED_USE";
   is_skipped: boolean;
   is_auto_use: boolean;
   created_at: string;

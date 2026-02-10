@@ -18,6 +18,14 @@
       "period": "ANNUAL",
       "category": "Travel",
       "description": "$200 Delta eCredit issued after $10,000+ in eligible purchases in a calendar year. Valid for Delta-marketed flights; expires 1 year from issuance."
+    },
+    {
+      "name": "Free First Checked Bag",
+      "value": 35,
+      "period": "ANNUAL",
+      "benefit_type": "UNLIMITED_USE",
+      "category": "Travel",
+      "description": "First checked bag free on Delta flights for cardholder and companions on same reservation."
     }
   ],
   "multipliers": [

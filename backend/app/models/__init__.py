@@ -3,7 +3,7 @@ from .card_template import CardTemplate
 from .template_benefit import TemplateBenefit
 from .template_multiplier import TemplateMultiplier
 from .credit_card import CreditCard
-from .benefit import Benefit, BenefitPeriod
+from .benefit import Benefit, BenefitPeriod, BenefitType
 from .benefit_usage import BenefitUsage
 from .point_multiplier import PointMultiplier
 from .notification_preference import NotificationPreference
@@ -19,6 +19,7 @@ __all__ = [
     "CreditCard",
     "Benefit",
     "BenefitPeriod",
+    "BenefitType",
     "BenefitUsage",
     "PointMultiplier",
     "NotificationPreference",

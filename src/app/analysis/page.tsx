@@ -348,6 +348,8 @@ interface BenefitBreakdown {
   totalMissed: number;
   isSkipped: boolean;
   isAutoUse: boolean;
+  isUnlimited: boolean;
+  usageCount: number;
   periodsCompleted: number;
   periodsMissed: number;
   totalPastPeriods: number;
@@ -356,10 +358,39 @@ interface BenefitBreakdown {
 function computeBenefitBreakdowns(benefits: Benefit[]): BenefitBreakdown[] {
   const now = new Date();
   const year = now.getFullYear();
+  const yearStart = new Date(year, 0, 1);
 
   return benefits.map((benefit) => {
     const period = benefit.period as BenefitPeriod;
     const value = parseFloat(benefit.value);
+    const isUnlimited = benefit.benefit_type === "UNLIMITED_USE";
+
+    // For unlimited benefits, use different logic
+    if (isUnlimited) {
+      const thisYearUsages = benefit.usages.filter(u => new Date(u.used_at) >= yearStart);
+      const totalEarned = thisYearUsages.reduce((sum, u) => sum + parseFloat(u.used_amount), 0);
+      const usageCount = thisYearUsages.length;
+
+      return {
+        id: benefit.id,
+        name: benefit.name,
+        category: benefit.category,
+        period,
+        periodLabel: "use",
+        valuePerPeriod: value,
+        annualValue: 0, // No fixed annual value for unlimited
+        totalEarned,
+        totalMissed: 0, // Can't miss unlimited benefits
+        isSkipped: benefit.is_skipped,
+        isAutoUse: benefit.is_auto_use,
+        isUnlimited: true,
+        usageCount,
+        periodsCompleted: usageCount,
+        periodsMissed: 0,
+        totalPastPeriods: 0,
+      };
+    }
+
     const periodLabel =
       period === "MONTHLY" ? "month" : period === "QUARTERLY" ? "quarter" : period === "SEMI_ANNUAL" ? "half" : "year";
     const annualMultiplier = period === "MONTHLY" ? 12 : period === "QUARTERLY" ? 4 : period === "SEMI_ANNUAL" ? 2 : 1;
@@ -436,6 +467,8 @@ function computeBenefitBreakdowns(benefits: Benefit[]): BenefitBreakdown[] {
       totalMissed,
       isSkipped: benefit.is_skipped,
       isAutoUse: benefit.is_auto_use,
+      isUnlimited: false,
+      usageCount: 0,
       periodsCompleted,
       periodsMissed,
       totalPastPeriods,
@@ -540,6 +573,29 @@ function CardDetailModal({
                   .sort((a, b) => b.totalEarned - a.totalEarned)
                   .map((b) => {
                     const utilizationPct = b.annualValue > 0 ? (b.totalEarned / b.annualValue) * 100 : 0;
+
+                    // Unlimited-use benefit display
+                    if (b.isUnlimited) {
+                      return (
+                        <div
+                          key={b.id}
+                          className="rounded-lg border p-3 bg-purple-50 dark:bg-purple-900/10 border-purple-200 dark:border-purple-800"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{b.name}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-400 font-medium">Unlimited</span>
+                            </div>
+                            <span className="text-green-600 dark:text-green-400 font-semibold text-xs">{formatCurrency(b.totalEarned)}</span>
+                          </div>
+                          <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                            {b.usageCount} {b.usageCount === 1 ? 'use' : 'uses'} @ {formatCurrency(b.valuePerPeriod)} each
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    // Regular period-capped benefit display
                     return (
                       <div
                         key={b.id}

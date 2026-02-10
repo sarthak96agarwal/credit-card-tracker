@@ -4,7 +4,7 @@ from datetime import datetime
 import uuid
 
 from app.database import Base
-from app.models.benefit import BenefitPeriod
+from app.models.benefit import BenefitPeriod, BenefitType
 
 
 class TemplateBenefit(Base):
@@ -18,6 +18,7 @@ class TemplateBenefit(Base):
     period = Column(Enum(BenefitPeriod), nullable=False)
     category = Column(String, nullable=False)
     description = Column(String, nullable=True)
+    benefit_type = Column(Enum(BenefitType), default=BenefitType.PERIOD_CAPPED, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     template = relationship("CardTemplate", back_populates="template_benefits")

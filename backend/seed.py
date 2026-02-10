@@ -16,6 +16,7 @@ from app.models import (
     Benefit,
     PointMultiplier,
     BenefitPeriod,
+    BenefitType,
     NotificationPreference,
     NotificationHistory,
     CurrencyWallet,
@@ -38,6 +39,11 @@ def load_json(filepath: Path) -> dict:
 def period_from_string(period_str: str) -> BenefitPeriod:
     """Convert period string to BenefitPeriod enum."""
     return BenefitPeriod[period_str]
+
+
+def benefit_type_from_string(type_str: str) -> BenefitType:
+    """Convert benefit type string to BenefitType enum."""
+    return BenefitType[type_str]
 
 
 def seed_from_json():
@@ -107,7 +113,8 @@ def seed_from_json():
                         value=Decimal(str(benefit_data["value"])),
                         period=period_from_string(benefit_data["period"]),
                         category=benefit_data.get("category", "Other"),
-                        description=benefit_data.get("description")
+                        description=benefit_data.get("description"),
+                        benefit_type=benefit_type_from_string(benefit_data.get("benefit_type", "PERIOD_CAPPED"))
                     )
                     db.add(template_benefit)
                     template_benefits_created += 1
@@ -195,6 +202,7 @@ def seed_from_json():
                         period=tb.period,
                         category=tb.category,
                         description=tb.description,
+                        benefit_type=tb.benefit_type,
                         is_skipped=False,
                         is_auto_use=False,
                     )

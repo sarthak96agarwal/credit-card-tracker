@@ -100,7 +100,7 @@ export default function Dashboard() {
     });
   }, [selectedOwner, owners]);
 
-  const refreshBenefits = () => {
+  const refreshBenefits = (selectedBenefitId?: string) => {
     api.getBenefits().then((data) => {
       let filtered = data;
       if (selectedOwner) {
@@ -108,6 +108,14 @@ export default function Dashboard() {
         filtered = filtered.filter(b => ownerCardIds.includes(b.card_id));
       }
       setBenefits(filtered);
+      // Update selectedBenefit with fresh data if one is selected
+      const benefitIdToUpdate = selectedBenefitId || selectedBenefit?.id;
+      if (benefitIdToUpdate) {
+        const updated = filtered.find(b => b.id === benefitIdToUpdate);
+        if (updated) {
+          setSelectedBenefit(updated);
+        }
+      }
     });
   };
 
@@ -185,19 +193,33 @@ export default function Dashboard() {
   const filteredBenefits = benefits
     .filter(benefit => {
       const { isCompleted, daysRemaining } = getBenefitStatus(benefit);
+      const isUnlimited = benefit.benefit_type === "UNLIMITED_USE";
 
       // Time filter
       if (timeFilter === "skipped") return benefit.is_skipped;
-      if (timeFilter === "week" && (isCompleted || daysRemaining > 7 || benefit.is_skipped)) return false;
-      if (timeFilter === "month" && (isCompleted || daysRemaining > 30 || benefit.is_skipped)) return false;
-      if (timeFilter === "completed") {
-        // Show benefits with at least one completed or missed past period
-        const instances = getPeriodInstances(benefit);
-        const hasHistory = instances.some(i => (i.isPast || i.isCurrent) && !(!i.isPast && !i.isCurrent));
-        const hasCompletedOrMissed = instances.some(i => i.isCompleted || (i.isPast && i.used < parseFloat(benefit.value)));
-        if (!hasCompletedOrMissed) return false;
+      // Unlimited benefits don't appear in urgency views (week/month) since they have no deadline
+      if (timeFilter === "week") {
+        if (isUnlimited || isCompleted || daysRemaining > 7 || benefit.is_skipped) return false;
       }
-      if (timeFilter === "all" && (isCompleted || benefit.is_skipped)) return false; // "Pending" shows only active pending
+      if (timeFilter === "month") {
+        if (isUnlimited || isCompleted || daysRemaining > 30 || benefit.is_skipped) return false;
+      }
+      if (timeFilter === "completed") {
+        // For unlimited benefits, show if they have any usages
+        if (isUnlimited) {
+          const yearStart = new Date(new Date().getFullYear(), 0, 1);
+          const hasUsages = benefit.usages.some(u => new Date(u.used_at) >= yearStart);
+          if (!hasUsages) return false;
+        } else {
+          // Show benefits with at least one completed or missed past period
+          const instances = getPeriodInstances(benefit);
+          const hasCompletedOrMissed = instances.some(i => i.isCompleted || (i.isPast && i.used < parseFloat(benefit.value)));
+          if (!hasCompletedOrMissed) return false;
+        }
+      }
+      // "Pending" shows active pending benefits and all unlimited-use benefits (they're always "available")
+      if (timeFilter === "all" && !isUnlimited && (isCompleted || benefit.is_skipped)) return false;
+      if (timeFilter === "all" && benefit.is_skipped) return false;
 
       // Card filter
       if (cardFilter !== "all" && benefit.card_id !== cardFilter) return false;
@@ -207,6 +229,8 @@ export default function Dashboard() {
     .sort((a, b) => {
       const statusA = getBenefitStatus(a);
       const statusB = getBenefitStatus(b);
+      const isUnlimitedA = a.benefit_type === "UNLIMITED_USE";
+      const isUnlimitedB = b.benefit_type === "UNLIMITED_USE";
 
       // Skipped items go to very bottom
       if (a.is_skipped && !b.is_skipped) return 1;
@@ -216,17 +240,22 @@ export default function Dashboard() {
       if (statusA.isCompleted && !statusB.isCompleted) return 1;
       if (!statusA.isCompleted && statusB.isCompleted) return -1;
 
-      // Among non-completed, sort by days remaining (soonest first)
-      if (!statusA.isCompleted && !statusB.isCompleted) {
+      // Unlimited-use benefits go after urgent/pending but before completed
+      if (isUnlimitedA && !isUnlimitedB && !statusB.isCompleted) return 1;
+      if (!isUnlimitedA && isUnlimitedB && !statusA.isCompleted) return -1;
+
+      // Among non-completed period-capped benefits, sort by days remaining (soonest first)
+      if (!statusA.isCompleted && !statusB.isCompleted && !isUnlimitedA && !isUnlimitedB) {
         return statusA.daysRemaining - statusB.daysRemaining;
       }
 
       return 0;
     });
 
-  // Calculate totals (exclude skipped benefits)
+  // Calculate totals (exclude skipped and unlimited-use benefits from pending totals)
   const activeBenefits = benefits.filter(b => !b.is_skipped);
-  const pendingBenefits = activeBenefits.filter(b => !getBenefitStatus(b).isCompleted);
+  const periodCappedBenefits = activeBenefits.filter(b => b.benefit_type !== "UNLIMITED_USE");
+  const pendingBenefits = periodCappedBenefits.filter(b => !getBenefitStatus(b).isCompleted);
   const totalExpiring = pendingBenefits.reduce((sum, b) => sum + getBenefitStatus(b).remaining, 0);
   const expiringThisWeek = pendingBenefits
     .filter(b => getBenefitStatus(b).daysRemaining <= 7)
@@ -240,8 +269,8 @@ export default function Dashboard() {
       .reduce((s, u) => s + parseFloat(u.used_amount), 0);
   }, 0);
 
-  // Calculate total lost (past periods that weren't fully used, excluding skipped)
-  const totalLost = activeBenefits.reduce((sum, benefit) => {
+  // Calculate total lost (past periods that weren't fully used, excluding skipped and unlimited-use)
+  const totalLost = periodCappedBenefits.reduce((sum, benefit) => {
     const period = benefit.period as BenefitPeriod;
     const benefitValue = parseFloat(benefit.value);
     const now = new Date();
@@ -386,7 +415,17 @@ export default function Dashboard() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredBenefits.map((benefit) => (
-            timeFilter === "completed" ? (
+            benefit.benefit_type === "UNLIMITED_USE" ? (
+              <UnlimitedBenefitCard
+                key={benefit.id}
+                benefit={benefit}
+                onAddUsage={() => {
+                  setSelectedBenefit(benefit);
+                  setSelectedPeriodIndex(null);
+                }}
+                onRefresh={refreshBenefits}
+              />
+            ) : timeFilter === "completed" ? (
               <CompletedBenefitCard
                 key={benefit.id}
                 benefit={benefit}
@@ -410,7 +449,16 @@ export default function Dashboard() {
       )}
 
       {/* Mark Used Modal */}
-      {selectedBenefit && (
+      {selectedBenefit && selectedBenefit.benefit_type === "UNLIMITED_USE" ? (
+        <UnlimitedBenefitModal
+          benefit={selectedBenefit}
+          onClose={() => {
+            setSelectedBenefit(null);
+            setSelectedPeriodIndex(null);
+          }}
+          onRefresh={refreshBenefits}
+        />
+      ) : selectedBenefit && (
         <BenefitModal
           benefit={selectedBenefit}
           onClose={() => {
@@ -534,6 +582,120 @@ function BenefitCard({ benefit, onClick }: { benefit: Benefit; onClick: () => vo
           {formatCurrency(benefitValue)}/{periodLabel}
         </span>
         {getUrgencyBadge(daysRemaining, isCompleted, isSkipped, isAutoUse)}
+      </div>
+    </div>
+  );
+}
+
+function UnlimitedBenefitCard({
+  benefit,
+  onAddUsage,
+  onRefresh,
+}: {
+  benefit: Benefit;
+  onAddUsage: () => void;
+  onRefresh: () => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const benefitValue = parseFloat(benefit.value);
+  const cardImage = getCardImage(benefit.card.name);
+
+  // Calculate total earned this year (all usages)
+  const yearStart = new Date(new Date().getFullYear(), 0, 1);
+  const thisYearUsages = benefit.usages.filter(u => new Date(u.used_at) >= yearStart);
+  const totalEarned = thisYearUsages.reduce((sum, u) => sum + parseFloat(u.used_amount), 0);
+  const usageCount = thisYearUsages.length;
+
+  const handleAddBag = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAdding(true);
+    try {
+      const { start, end } = getCurrentPeriodDates("ANNUAL");
+      await api.createBenefitUsage({
+        benefit_id: benefit.id,
+        period_start: start.toISOString(),
+        period_end: end.toISOString(),
+        used_amount: benefitValue,
+        notes: `Bag ${usageCount + 1}`,
+      });
+      onRefresh();
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <div
+      onClick={onAddUsage}
+      className="rounded-xl border-2 p-5 cursor-pointer hover:shadow-lg transition-all bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold leading-tight truncate text-gray-900 dark:text-gray-100">{benefit.name}</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{benefit.card.name}</p>
+        </div>
+        <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+          {cardImage && (
+            <div className="w-10 h-6 relative">
+              <Image
+                src={cardImage}
+                alt={benefit.card.name}
+                fill
+                className="object-contain rounded"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Hero: Total earned */}
+      <div className="mb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+              {formatCurrency(totalEarned)}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {usageCount} {usageCount === 1 ? 'bag' : 'bags'} logged this year
+            </p>
+          </div>
+          <button
+            onClick={handleAddBag}
+            disabled={adding}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-blue-400 transition-colors flex items-center gap-1.5"
+          >
+            {adding ? (
+              <>
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Adding...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Bag
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-700">
+        <span className="text-xs text-gray-400">
+          {formatCurrency(benefitValue)}/bag
+        </span>
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-400">
+          Unlimited
+        </span>
       </div>
     </div>
   );
@@ -1022,6 +1184,189 @@ function BenefitModal({
             )}
           </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UnlimitedBenefitModal({
+  benefit,
+  onClose,
+  onRefresh,
+}: {
+  benefit: Benefit;
+  onClose: () => void;
+  onRefresh: (benefitId?: string) => void;
+}) {
+  const benefitValue = parseFloat(benefit.value);
+  const cardImage = getCardImage(benefit.card.name);
+  const [adding, setAdding] = useState(false);
+  const [notes, setNotes] = useState("");
+
+  // Get this year's usages
+  const yearStart = new Date(new Date().getFullYear(), 0, 1);
+  const thisYearUsages = benefit.usages
+    .filter(u => new Date(u.used_at) >= yearStart)
+    .sort((a, b) => new Date(b.used_at).getTime() - new Date(a.used_at).getTime());
+  const totalEarned = thisYearUsages.reduce((sum, u) => sum + parseFloat(u.used_amount), 0);
+  const usageCount = thisYearUsages.length;
+
+  const handleAddBag = async () => {
+    setAdding(true);
+    try {
+      const { start, end } = getCurrentPeriodDates("ANNUAL");
+      await api.createBenefitUsage({
+        benefit_id: benefit.id,
+        period_start: start.toISOString(),
+        period_end: end.toISOString(),
+        used_amount: benefitValue,
+        notes: notes || `Bag ${usageCount + 1}`,
+      });
+      setNotes("");
+      onRefresh(benefit.id);
+      // Don't close - stay open so user can add more or see history
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleDeleteUsage = async (usageId: string) => {
+    if (confirm("Delete this bag entry?")) {
+      await api.deleteBenefitUsage(usageId);
+      onRefresh(benefit.id);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="p-5 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              {cardImage && (
+                <div className="w-12 h-8 relative flex-shrink-0">
+                  <Image
+                    src={cardImage}
+                    alt={benefit.card.name}
+                    fill
+                    className="object-contain rounded"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{benefit.name}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{benefit.card.name}</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-5 flex-1 overflow-auto">
+          {/* Summary */}
+          <div className="bg-green-50 dark:bg-green-900/30 rounded-xl p-4 mb-4">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+                {formatCurrency(totalEarned)}
+              </div>
+              <p className="text-sm text-green-700 dark:text-green-400">
+                {usageCount} {usageCount === 1 ? 'bag' : 'bags'} logged this year
+              </p>
+            </div>
+          </div>
+
+          {/* Add New Bag */}
+          <div className="mb-4 p-4 border border-gray-200 dark:border-gray-700 rounded-xl">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Log a Bag</h3>
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Optional: Flight number, notes..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <button
+                onClick={handleAddBag}
+                disabled={adding}
+                className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-blue-400 transition-colors flex items-center justify-center gap-2"
+              >
+                {adding ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Bag ({formatCurrency(benefitValue)})
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Usage History */}
+          {thisYearUsages.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">History</h3>
+              <div className="space-y-2 max-h-48 overflow-auto">
+                {thisYearUsages.map((usage, idx) => (
+                  <div
+                    key={usage.id}
+                    className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                  >
+                    <div>
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Bag {usageCount - idx}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                        {new Date(usage.used_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                        {formatCurrency(parseFloat(usage.used_amount))}
+                      </span>
+                      <button
+                        onClick={() => handleDeleteUsage(usage.id)}
+                        className="text-gray-400 hover:text-red-500 p-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-100 dark:border-gray-800">
+          <div className="flex justify-between items-center text-xs text-gray-500">
+            <span>{formatCurrency(benefitValue)} per bag</span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-400 font-medium">
+              Unlimited uses
+            </span>
+          </div>
         </div>
       </div>
     </div>
