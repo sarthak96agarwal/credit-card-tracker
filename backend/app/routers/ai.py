@@ -42,6 +42,28 @@ class InsightsResponse(BaseModel):
     configured: bool
 
 
+class SpendingLookupRequest(BaseModel):
+    query: str
+    use_ai: bool = True
+
+
+class CardRanking(BaseModel):
+    card_name: str
+    card_color: str
+    owner_name: str
+    multiplier: float
+    notes: Optional[str] = None
+
+
+class SpendingLookupResponse(BaseModel):
+    query: str
+    matched_category: str
+    match_type: str  # "exact", "ai", "fallback"
+    rankings: List[CardRanking]
+    ai_reasoning: Optional[str] = None
+    configured: bool
+
+
 @router.get("/status")
 def get_ai_status():
     """Check if AI service is configured."""
@@ -159,3 +181,89 @@ def recommend_card(request: CardRecommendationRequest, db: Session = Depends(get
         "recommendation": recommendation,
         "configured": ai_service.is_configured()
     }
+
+
+@router.post("/spending-lookup", response_model=SpendingLookupResponse)
+def spending_lookup(request: SpendingLookupRequest, db: Session = Depends(get_db)):
+    """Look up which card to use for a spending query across all owners."""
+    # Get all cards with multipliers
+    cards = db.query(CreditCard).all()
+
+    if not cards:
+        return SpendingLookupResponse(
+            query=request.query,
+            matched_category="Everything Else",
+            match_type="fallback",
+            rankings=[],
+            configured=ai_service.is_configured()
+        )
+
+    # Build category list from all cards
+    all_categories = set()
+    for card in cards:
+        for m in card.multipliers:
+            all_categories.add(m.category)
+    categories_list = sorted(all_categories)
+
+    # Try exact match (case-insensitive)
+    query_lower = request.query.strip().lower()
+    matched_category = None
+    match_type = "fallback"
+    ai_reasoning = None
+
+    for cat in categories_list:
+        if cat.lower() == query_lower:
+            matched_category = cat
+            match_type = "exact"
+            break
+
+    # If no exact match, try AI
+    if not matched_category and request.use_ai and ai_service.is_configured():
+        result = ai_service.resolve_spending_category(request.query, categories_list)
+        if result:
+            matched_category = result["category"]
+            match_type = "ai"
+            ai_reasoning = result.get("reasoning")
+
+    # Fallback to "Everything Else"
+    if not matched_category:
+        matched_category = "Everything Else"
+        match_type = "fallback"
+
+    # Rank cards for the matched category
+    rankings = []
+    for card in cards:
+        for m in card.multipliers:
+            if m.category == matched_category:
+                rankings.append(CardRanking(
+                    card_name=card.name,
+                    card_color=card.color,
+                    owner_name=card.owner.name if card.owner else "Unknown",
+                    multiplier=float(m.multiplier),
+                    notes=m.notes
+                ))
+
+    # If we matched a specific category but no cards have it, fall back to Everything Else
+    if not rankings and matched_category != "Everything Else":
+        for card in cards:
+            for m in card.multipliers:
+                if m.category == "Everything Else":
+                    rankings.append(CardRanking(
+                        card_name=card.name,
+                        card_color=card.color,
+                        owner_name=card.owner.name if card.owner else "Unknown",
+                        multiplier=float(m.multiplier),
+                        notes=m.notes
+                    ))
+
+    # Sort by multiplier descending
+    rankings.sort(key=lambda r: r.multiplier, reverse=True)
+
+    return SpendingLookupResponse(
+        query=request.query,
+        matched_category=matched_category,
+        match_type=match_type,
+        rankings=rankings,
+        ai_reasoning=ai_reasoning,
+        configured=ai_service.is_configured()
+    )

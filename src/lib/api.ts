@@ -94,6 +94,7 @@ export interface MultiplierBasic {
   id: string;
   category: string;
   multiplier: string;
+  notes: string | null;
 }
 
 export interface Benefit {
@@ -177,6 +178,23 @@ export interface ChatResponse {
 export interface AIStatus {
   configured: boolean;
   model: string | null;
+}
+
+export interface CardRanking {
+  card_name: string;
+  card_color: string;
+  owner_name: string;
+  multiplier: number;
+  notes: string | null;
+}
+
+export interface SpendingLookupResponse {
+  query: string;
+  matched_category: string;
+  match_type: "exact" | "ai" | "fallback";
+  rankings: CardRanking[];
+  ai_reasoning: string | null;
+  configured: boolean;
 }
 
 // Wallet types
@@ -379,6 +397,11 @@ export const api = {
         body: JSON.stringify({ owner_id: ownerId, category }),
       }
     ),
+  spendingLookup: (query: string, useAI: boolean = true) =>
+    fetchAPI<SpendingLookupResponse>("/ai/spending-lookup", {
+      method: "POST",
+      body: JSON.stringify({ query, use_ai: useAI }),
+    }),
 
   // Wallets
   getAllWallets: () =>
