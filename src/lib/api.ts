@@ -255,6 +255,36 @@ export interface Wallet {
   on_track: boolean;
 }
 
+// ── RAG types ─────────────────────────────────────────────────────────────────
+
+export interface RAGSource {
+  text: string;
+  card_name: string;
+  source_file: string;
+  page: string;
+  score: number | null;
+}
+
+export interface RAGResponse {
+  answer: string;
+  sources: RAGSource[];
+  detected_cards: string[];
+}
+
+const RAG_URL = process.env.NEXT_PUBLIC_RAG_SERVICE_URL ?? "";
+
+export const ragApi = {
+  query: (question: string): Promise<RAGResponse> =>
+    fetch(`${RAG_URL}/query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    }).then((r) => {
+      if (!r.ok) throw new Error(`RAG error: ${r.status}`);
+      return r.json();
+    }),
+};
+
 // API functions
 export const api = {
   // Owners
