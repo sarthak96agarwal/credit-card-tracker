@@ -94,6 +94,7 @@ export interface MultiplierBasic {
   id: string;
   category: string;
   multiplier: string;
+  notes: string | null;
 }
 
 export interface Benefit {
@@ -179,6 +180,23 @@ export interface AIStatus {
   model: string | null;
 }
 
+export interface CardRanking {
+  card_name: string;
+  card_color: string;
+  owner_name: string;
+  multiplier: number;
+  notes: string | null;
+}
+
+export interface SpendingLookupResponse {
+  query: string;
+  matched_category: string;
+  match_type: "exact" | "ai" | "fallback";
+  rankings: CardRanking[];
+  ai_reasoning: string | null;
+  configured: boolean;
+}
+
 // Wallet types
 export interface MonthlyUsage {
   month: number;
@@ -236,6 +254,36 @@ export interface Wallet {
   max_spendable_this_year: string;
   on_track: boolean;
 }
+
+// ── RAG types ─────────────────────────────────────────────────────────────────
+
+export interface RAGSource {
+  text: string;
+  card_name: string;
+  source_file: string;
+  page: string;
+  score: number | null;
+}
+
+export interface RAGResponse {
+  answer: string;
+  sources: RAGSource[];
+  detected_cards: string[];
+}
+
+const RAG_URL = process.env.NEXT_PUBLIC_RAG_SERVICE_URL ?? "";
+
+export const ragApi = {
+  query: (question: string): Promise<RAGResponse> =>
+    fetch(`${RAG_URL}/query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    }).then((r) => {
+      if (!r.ok) throw new Error(`RAG error: ${r.status}`);
+      return r.json();
+    }),
+};
 
 // API functions
 export const api = {
@@ -379,6 +427,11 @@ export const api = {
         body: JSON.stringify({ owner_id: ownerId, category }),
       }
     ),
+  spendingLookup: (query: string, useAI: boolean = true) =>
+    fetchAPI<SpendingLookupResponse>("/ai/spending-lookup", {
+      method: "POST",
+      body: JSON.stringify({ query, use_ai: useAI }),
+    }),
 
   // Wallets
   getAllWallets: () =>

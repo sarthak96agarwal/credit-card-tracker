@@ -41,6 +41,7 @@ class MultiplierBasic(BaseModel):
     id: str
     category: str
     multiplier: Decimal
+    notes: Optional[str] = None
 
     class Config:
         from_attributes = True

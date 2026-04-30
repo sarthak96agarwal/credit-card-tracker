@@ -1,7 +1,8 @@
 """AI service using Google Gemini for insights and chat."""
 import os
+import json
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict
 from decimal import Decimal
 import google.generativeai as genai
 
@@ -171,6 +172,54 @@ Guidelines:
         except Exception as e:
             logger.error(f"Error in chat: {e}")
             return "Sorry, I encountered an error. Please try again."
+
+    def resolve_spending_category(
+        self,
+        query: str,
+        available_categories: List[str]
+    ) -> Optional[Dict[str, str]]:
+        """Use LLM to resolve a free-text spending query to a known category.
+
+        Returns dict with 'category' and 'reasoning', or None on failure.
+        """
+        if not self.is_configured():
+            return None
+
+        categories_str = ", ".join(available_categories)
+        prompt = f"""You are a spending category classifier. Given a user's description of a purchase, determine which credit card spending category it belongs to.
+
+Available categories: {categories_str}
+
+User query: "{query}"
+
+Respond with ONLY valid JSON in this exact format:
+{{"category": "matched category from the list above", "reasoning": "one sentence explanation"}}
+
+Rules:
+- You MUST pick a category from the available list above
+- If the query clearly matches a category, use that category
+- If unsure, use "Everything Else"
+- Do not invent new categories"""
+
+        try:
+            response = self.model.generate_content(prompt)
+            text = response.text.strip()
+            # Strip markdown code fences if present
+            if text.startswith("```"):
+                text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+                if text.endswith("```"):
+                    text = text[:-3].strip()
+                elif "```" in text:
+                    text = text[:text.rfind("```")].strip()
+
+            result = json.loads(text)
+            if result.get("category") in available_categories:
+                return result
+            logger.warning(f"LLM returned invalid category: {result.get('category')}")
+            return None
+        except (json.JSONDecodeError, Exception) as e:
+            logger.error(f"Error resolving spending category: {e}")
+            return None
 
     def get_card_recommendation(
         self,

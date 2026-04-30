@@ -49,6 +49,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",  # Local development
         "https://credit-card-tracker-production.up.railway.app",  # Railway frontend
+        "https://credit-card-tracker-dev.up.railway.app", # Railway dev frontend
     ],
     allow_credentials=True,
     allow_methods=["*"],
