@@ -285,6 +285,59 @@ export const ragApi = {
     }),
 };
 
+// ── Agent types ────────────────────────────────────────────────────────────────
+
+export interface AgentMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL ?? "";
+
+export const agentApi = {
+  /**
+   * Streaming chat — yields text chunks via SSE.
+   * During tool execution no chunks arrive; the caller should show a loading
+   * indicator until the first chunk is received.
+   */
+  chatStream: async function* (
+    message: string,
+    owner_id: string,
+    history: AgentMessage[]
+  ): AsyncGenerator<string> {
+    const resp = await fetch(`${AGENT_URL}/chat/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, owner_id, history }),
+    });
+    if (!resp.ok || !resp.body) throw new Error(`Agent error: ${resp.status}`);
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop()!;
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const raw = line.slice(6).trim();
+        if (raw === "[DONE]") return;
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed.error) throw new Error(parsed.error);
+          if (parsed.chunk) yield parsed.chunk as string;
+        } catch {
+          // ignore malformed SSE lines
+        }
+      }
+    }
+  },
+};
+
 // API functions
 export const api = {
   // Owners
